@@ -6,7 +6,7 @@ from typing import Any, Optional
 import aiohttp
 from homeassistant.core import HomeAssistant
 
-from ..const import DEFAULT_TIMEOUT, LOGGER, SAMSUNG_KEY_MAP
+from ..const import DEFAULT_TIMEOUT, LOGGER, SAMSUNG_KEY_MAP, SMARTTHINGS_COMMANDS
 
 
 class SmartThingsAPI:
@@ -152,9 +152,21 @@ class SmartThingsAPI:
         
         For Samsung TVs, we need to use the samsungvd.remoteControl capability
         with the 'send' command and the key code as argument.
+        
+        Note: SmartThings only supports a limited set of commands.
+        Commands not in SMARTTHINGS_COMMANDS will be logged as unsupported.
         """
         try:
             key = SAMSUNG_KEY_MAP.get(command, command)
+            
+            # Check if command is supported by SmartThings
+            if key not in SMARTTHINGS_COMMANDS:
+                LOGGER.warning(
+                    f"Command '{command}' (key: {key}) is not supported by SmartThings API. "
+                    f"This command only works with Tizen Local API. "
+                    f"Supported SmartThings commands: {', '.join(sorted(SMARTTHINGS_COMMANDS))}"
+                )
+                return False
             
             # Samsung TVs use samsungvd.remoteControl capability
             payload = {
@@ -182,20 +194,11 @@ class SmartThingsAPI:
             if "422" in error_msg or "ConstraintViolationError" in error_msg:
                 LOGGER.error(
                     f"API rejected command. This might mean:\n"
-                    f"1. The key code '{key}' is not supported\n"
+                    f"1. The key code '{key}' is not supported by SmartThings\n"
                     f"2. The TV is offline\n"
-                    f"3. The capability format is wrong"
+                    f"3. The capability format is wrong\n"
+                    f"Supported commands: {', '.join(sorted(SMARTTHINGS_COMMANDS))}"
                 )
-                
-                # Try to get available commands from the capability
-                try:
-                    cap_details = await self._request(
-                        "GET", 
-                        f"/capabilities/samsungvd.remoteControl/1"
-                    )
-                    LOGGER.debug(f"Capability details: {cap_details}")
-                except Exception:
-                    pass
             
             return False
 
