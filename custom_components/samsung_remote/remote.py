@@ -1,8 +1,8 @@
 """Remote entity for Samsung TV."""
 import asyncio
-from typing import Any
+from typing import Any, Iterable
 
-from homeassistant.components.remote import RemoteEntity, RemoteEntityFeature
+from homeassistant.components.remote import RemoteEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -32,6 +32,7 @@ class SamsungRemote(RemoteEntity):
 
     _attr_has_entity_name = True
     _attr_name = None
+    _attr_should_poll = False
 
     def __init__(
         self,
@@ -47,11 +48,6 @@ class SamsungRemote(RemoteEntity):
         self._api = api
         self._device_id = device_id
         self._device_name = device_name
-        self._attr_supported_features = (
-            RemoteEntityFeature.SEND_COMMAND
-            | RemoteEntityFeature.TURN_ON
-            | RemoteEntityFeature.TURN_OFF
-        )
         self._attr_unique_id = f"{device_id}_remote"
         self._attr_icon = "mdi:remote"
         self._attr_is_on = True  # Assume on by default
@@ -68,10 +64,12 @@ class SamsungRemote(RemoteEntity):
             "sw_version": None,
         }
 
-    async def async_send_command(self, command: list[str], **kwargs: Any) -> None:
+    async def async_send_command(self, command: Iterable[str], **kwargs: Any) -> None:
         """Send command to remote."""
         num_repeats = kwargs.get("num_repeats", 1)
         delay = kwargs.get("delay_secs", 0.4)
+        
+        LOGGER.debug(f"Sending commands: {command}, repeats: {num_repeats}, delay: {delay}")
         
         try:
             for _ in range(num_repeats):
@@ -87,25 +85,33 @@ class SamsungRemote(RemoteEntity):
                         LOGGER.warning(
                             f"Command {cmd} may have failed for {self._device_name}"
                         )
+                    else:
+                        LOGGER.debug(f"Successfully sent command: {cmd}")
                     
                     # Delay between commands
-                    if len(command) > 1 or num_repeats > 1:
+                    if len(list(command)) > 1 or num_repeats > 1:
                         await asyncio.sleep(delay)
                         
+            self._attr_available = True
+                        
         except Exception as e:
-            LOGGER.error(f"Failed to send command: {e}")
+            LOGGER.error(f"Failed to send command: {e}", exc_info=True)
             self._attr_available = False
             raise
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the device on."""
+        LOGGER.debug(f"Turning on {self._device_name}")
         await self.async_send_command(["POWER"])
         self._attr_is_on = True
+        self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the device off."""
+        LOGGER.debug(f"Turning off {self._device_name}")
         await self.async_send_command(["POWER"])
         self._attr_is_on = False
+        self.async_write_ha_state()
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -121,3 +127,10 @@ class SamsungRemote(RemoteEntity):
         # Most Samsung TVs don't provide reliable power state via API
         # Keeping entity available unless commands fail
         pass
+    
+    async def async_added_to_hass(self) -> None:
+        """Run when entity is added to hass."""
+        await super().async_added_to_hass()
+        LOGGER.info(
+            f"Samsung Remote entity added: {self._device_name} ({self._device_id})"
+        )
