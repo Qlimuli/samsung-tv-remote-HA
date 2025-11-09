@@ -61,7 +61,7 @@ BUTTON_COMMANDS = {
         "translation_key": "menu",
     },
     "back": {
-        "command": "RETURN",
+        "command": "BACK",
         "icon": "mdi:arrow-left",
         "translation_key": "back",
     },
@@ -91,7 +91,7 @@ BUTTON_COMMANDS = {
         "translation_key": "right",
     },
     "enter": {
-        "command": "ENTER",
+        "command": "OK",
         "icon": "mdi:keyboard-return",
         "translation_key": "enter",
     },
