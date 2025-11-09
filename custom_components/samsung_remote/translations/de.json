@@ -1,0 +1,42 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Samsung Fernbedienung Setup",
+        "description": "Wählen Sie Ihre Verbindungsmethode zur Samsung TV",
+        "data": {
+          "api_method": "Verbindungsmethode"
+        }
+      },
+      "smartthings": {
+        "title": "SmartThings API Setup",
+        "description": "Geben Sie Ihr persönliches SmartThings-Zugriffstoken ein",
+        "data": {
+          "smartthings_token": "SmartThings Token"
+        }
+      },
+      "tizen_local": {
+        "title": "Lokales TV-Setup",
+        "description": "Verbinden Sie sich direkt mit Ihrem TV über das lokale Netzwerk",
+        "data": {
+          "local_ip": "TV IP-Adresse",
+          "local_psk": "Vorher geteilter Schlüssel (optional)",
+          "device_name": "Gerätename"
+        }
+      },
+      "select_device": {
+        "title": "Gerät auswählen",
+        "description": "Wählen Sie welchen Samsung TV Sie steuern möchten",
+        "data": {
+          "device_id": "TV-Gerät"
+        }
+      }
+    },
+    "error": {
+      "invalid_token": "Ungültiges SmartThings-Token",
+      "connection_error": "Verbindungsfehler aufgetreten",
+      "no_devices_found": "Keine Samsung TVs in Ihrem SmartThings-Konto gefunden",
+      "connection_failed": "Verbindung zum TV fehlgeschlagen"
+    }
+  }
+}

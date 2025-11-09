@@ -1,0 +1,42 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Samsung Remote Setup",
+        "description": "Choose how to connect to your Samsung TV",
+        "data": {
+          "api_method": "Connection Method"
+        }
+      },
+      "smartthings": {
+        "title": "SmartThings API Setup",
+        "description": "Enter your SmartThings Personal Access Token",
+        "data": {
+          "smartthings_token": "SmartThings Token"
+        }
+      },
+      "tizen_local": {
+        "title": "Local TV Setup",
+        "description": "Connect directly to your TV via local network",
+        "data": {
+          "local_ip": "TV IP Address",
+          "local_psk": "Pre-Shared Key (optional)",
+          "device_name": "Device Name"
+        }
+      },
+      "select_device": {
+        "title": "Select Device",
+        "description": "Choose which Samsung TV to control",
+        "data": {
+          "device_id": "TV Device"
+        }
+      }
+    },
+    "error": {
+      "invalid_token": "Invalid SmartThings token",
+      "connection_error": "Connection error occurred",
+      "no_devices_found": "No Samsung TVs found in your SmartThings account",
+      "connection_failed": "Failed to connect to TV"
+    }
+  }
+}
