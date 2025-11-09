@@ -98,7 +98,7 @@ class SmartThingsAPI:
                     # Cache capabilities for this device
                     capabilities = self._get_device_capabilities(device)
                     self.device_capabilities[device_id] = capabilities
-                    LOGGER.debug(f"Device {device_id} capabilities: {capabilities}")
+                    LOGGER.info(f"Device {device.get('label', device_id)} capabilities: {capabilities}")
                     
                     tv_devices.append(device)
             
@@ -148,50 +148,54 @@ class SmartThingsAPI:
         return False
 
     async def send_command(self, device_id: str, command: str) -> bool:
-        """Send remote command to device."""
+        """Send remote command to device using SmartThings API.
+        
+        For Samsung TVs, we need to use the samsungvd.remoteControl capability
+        with the 'send' command and the key code as argument.
+        """
         try:
             key = SAMSUNG_KEY_MAP.get(command, command)
             
-            # Get device capabilities
-            capabilities = self.device_capabilities.get(device_id, [])
-            
-            # Determine which capability to use
-            capability = None
-            if "samsungvd.remoteControl" in capabilities:
-                capability = "samsungvd.remoteControl"
-                command_name = "send"
-            elif "samsungvd.mediaInputSource" in capabilities and command in ["SOURCE", "HDMI"]:
-                capability = "samsungvd.mediaInputSource"
-                command_name = "setInputSource"
-            else:
-                # Fallback to trying common capabilities
-                LOGGER.warning(f"No remote control capability found for {device_id}, trying fallback")
-                capability = "samsungvd.remoteControl"
-                command_name = "send"
-            
+            # Samsung TVs use samsungvd.remoteControl capability
             payload = {
                 "commands": [
                     {
                         "component": "main",
-                        "capability": capability,
-                        "command": command_name,
-                        "arguments": [key] if command_name == "send" else [key],
+                        "capability": "samsungvd.remoteControl",
+                        "command": "send",
+                        "arguments": [key]
                     }
                 ]
             }
             
-            LOGGER.debug(f"Sending to {device_id}: {payload}")
+            LOGGER.debug(f"Sending command to {device_id}: capability=samsungvd.remoteControl, command=send, key={key}")
+            
             await self._request("POST", f"/devices/{device_id}/commands", payload)
-            LOGGER.debug(f"Successfully sent command {command} ({key}) to device {device_id}")
+            LOGGER.debug(f"Successfully sent command {command} (key: {key})")
             return True
             
         except Exception as e:
-            LOGGER.error(f"Failed to send command {command}: {e}")
+            error_msg = str(e)
+            LOGGER.error(f"Failed to send command {command} (key: {key}): {error_msg}")
             
-            # Try to get more detailed device info on first failure
-            if device_id in self.device_cache:
-                device = self.device_cache[device_id]
-                LOGGER.debug(f"Device details: {device}")
+            # Log more details on first failure to help debug
+            if "422" in error_msg or "ConstraintViolationError" in error_msg:
+                LOGGER.error(
+                    f"API rejected command. This might mean:\n"
+                    f"1. The key code '{key}' is not supported\n"
+                    f"2. The TV is offline\n"
+                    f"3. The capability format is wrong"
+                )
+                
+                # Try to get available commands from the capability
+                try:
+                    cap_details = await self._request(
+                        "GET", 
+                        f"/capabilities/samsungvd.remoteControl/1"
+                    )
+                    LOGGER.debug(f"Capability details: {cap_details}")
+                except Exception:
+                    pass
             
             return False
 
