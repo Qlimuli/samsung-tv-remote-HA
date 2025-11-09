@@ -24,7 +24,7 @@ All notable changes to this project will be documented in this file.
 - Input validation on all user inputs
 \`\`\`
 
-```text file="LICENSE"
+\`\`\`text file="LICENSE"
 MIT License
 
 Copyright (c) 2024 v0 Samsung Remote Contributors
