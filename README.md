@@ -26,7 +26,7 @@ A HACS-compatible Home Assistant custom integration for controlling Samsung Smar
 
 1. Clone this repository to your `custom_components` folder:
    \`\`\`bash
-   git clone https://github.com/v0/hacs-samsung-remote.git \
+   git clone https://github.com/Qlimuli/samsung-tv-remote-HA.git \
      ~/.homeassistant/custom_components/samsung_remote
    \`\`\`
 2. Restart Home Assistant
