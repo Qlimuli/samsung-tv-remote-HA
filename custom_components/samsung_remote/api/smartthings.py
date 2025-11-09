@@ -1,13 +1,12 @@
 """SmartThings API client for Samsung devices."""
 
 import asyncio
-import json
 from typing import Any, Optional
 
 import aiohttp
 from homeassistant.core import HomeAssistant
 
-from ..const import LOGGER, DEFAULT_TIMEOUT, SAMSUNG_KEY_MAP
+from ..const import DEFAULT_TIMEOUT, LOGGER, SAMSUNG_KEY_MAP
 
 
 class SmartThingsAPI:
@@ -32,6 +31,7 @@ class SmartThingsAPI:
         """Close session."""
         if self.session and not self.session.closed:
             await self.session.close()
+            self.session = None
 
     async def _request(
         self,
@@ -57,7 +57,7 @@ class SmartThingsAPI:
                 json=data,
                 timeout=aiohttp.ClientTimeout(total=self.timeout),
             ) as resp:
-                if resp.status == 200 or resp.status == 201:
+                if resp.status in (200, 201):
                     return await resp.json()
                 elif resp.status == 429 and retry_count < max_retries:
                     wait_time = 2 ** retry_count
@@ -77,6 +77,9 @@ class SmartThingsAPI:
                     method, endpoint, data, retry_count + 1, max_retries
                 )
             raise
+        except Exception as e:
+            LOGGER.error(f"Request failed: {e}")
+            raise
 
     async def get_devices(self) -> list[dict[str, Any]]:
         """Fetch all devices from SmartThings."""
@@ -91,6 +94,7 @@ class SmartThingsAPI:
                     self.device_cache[device["deviceId"]] = device
                     tv_devices.append(device)
             
+            LOGGER.debug(f"Found {len(tv_devices)} TV devices")
             return tv_devices
         except Exception as e:
             LOGGER.error(f"Failed to fetch devices: {e}")
@@ -98,12 +102,25 @@ class SmartThingsAPI:
 
     def _is_tv_device(self, device: dict[str, Any]) -> bool:
         """Check if device is a TV."""
-        device_type = device.get("deviceType", "").lower()
-        capabilities = [cap.get("id") for cap in device.get("components", [{}])[0].get("capabilities", [])]
+        device_type = device.get("deviceTypeName", "").lower()
+        device_type_id = device.get("deviceType", "").lower()
         
-        return "tv" in device_type or any(
-            cap in capabilities for cap in ["remoteControl", "mediaPlayback", "tvChannel"]
-        )
+        # Check device type
+        if "tv" in device_type or "tv" in device_type_id:
+            return True
+        
+        # Check capabilities
+        components = device.get("components", [])
+        if components and isinstance(components, list):
+            main_component = components[0] if components else {}
+            capabilities = main_component.get("capabilities", [])
+            capability_ids = [cap.get("id", "") for cap in capabilities if isinstance(cap, dict)]
+            
+            tv_capabilities = ["remoteControl", "mediaPlayback", "tvChannel", "audioVolume"]
+            if any(cap in capability_ids for cap in tv_capabilities):
+                return True
+        
+        return False
 
     async def send_command(self, device_id: str, command: str) -> bool:
         """Send remote command to device."""
@@ -121,7 +138,7 @@ class SmartThingsAPI:
             }
             
             await self._request("POST", f"/devices/{device_id}/commands", payload)
-            LOGGER.debug(f"Sent command {command} to device {device_id}")
+            LOGGER.debug(f"Sent command {command} ({key}) to device {device_id}")
             return True
         except Exception as e:
             LOGGER.error(f"Failed to send command {command}: {e}")
@@ -131,7 +148,9 @@ class SmartThingsAPI:
         """Validate SmartThings token."""
         try:
             response = await self._request("GET", "/devices")
-            return "items" in response
+            is_valid = "items" in response
+            LOGGER.debug(f"Token validation: {'success' if is_valid else 'failed'}")
+            return is_valid
         except Exception as e:
             LOGGER.error(f"Token validation failed: {e}")
             return False
