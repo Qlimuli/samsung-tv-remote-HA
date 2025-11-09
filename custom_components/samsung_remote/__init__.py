@@ -1,17 +1,23 @@
 """Samsung Remote integration."""
 
-import asyncio
 from typing import Final
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.entity_registry import async_migrate_entries
 
-from .const import DOMAIN, LOGGER
 from .api.smartthings import SmartThingsAPI
 from .api.tizen_local import TizenLocalAPI
+from .const import (
+    CONF_API_METHOD,
+    CONF_DEVICE_ID,
+    CONF_DEVICE_NAME,
+    CONF_LOCAL_IP,
+    CONF_LOCAL_PSK,
+    CONF_SMARTTHINGS_TOKEN,
+    DOMAIN,
+    LOGGER,
+)
 
 PLATFORMS: Final = ["remote"]
 
@@ -22,18 +28,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
     
     try:
-        api_method = entry.data.get("api_method", "smartthings")
+        api_method = entry.data.get(CONF_API_METHOD, "smartthings")
         
         if api_method == "smartthings":
-            token = entry.data.get("smartthings_token")
+            token = entry.data.get(CONF_SMARTTHINGS_TOKEN)
+            if not token:
+                raise ConfigEntryNotReady("SmartThings token missing")
+            
             api = SmartThingsAPI(hass, token)
             
             # Validate token
             if not await api.validate_token():
                 raise ConfigEntryNotReady("Invalid SmartThings token")
         else:
-            ip = entry.data.get("local_ip")
-            psk = entry.data.get("local_psk", "")
+            ip = entry.data.get(CONF_LOCAL_IP)
+            if not ip:
+                raise ConfigEntryNotReady("Local IP missing")
+            
+            psk = entry.data.get(CONF_LOCAL_PSK, "")
             api = TizenLocalAPI(ip, psk)
             
             # Validate connection
@@ -42,8 +54,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         
         hass.data[DOMAIN][entry.entry_id] = {
             "api": api,
-            "device_id": entry.data.get("device_id"),
-            "device_name": entry.data.get("device_name"),
+            "device_id": entry.data.get(CONF_DEVICE_ID),
+            "device_name": entry.data.get(CONF_DEVICE_NAME),
         }
         
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -58,13 +70,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    if DOMAIN in hass.data:
-        api = hass.data[DOMAIN][entry.entry_id].get("api")
-        if api:
-            await api.close()
-        del hass.data[DOMAIN][entry.entry_id]
-    
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    
+    if unload_ok and DOMAIN in hass.data and entry.entry_id in hass.data[DOMAIN]:
+        api = hass.data[DOMAIN][entry.entry_id].get("api")
+        if api and hasattr(api, "close"):
+            await api.close()
+        hass.data[DOMAIN].pop(entry.entry_id)
+    
     return unload_ok
 
 
