@@ -2,7 +2,7 @@
 
 from typing import Any, Optional
 
-from homeassistant.components.remote import RemoteEntity
+from homeassistant.components.remote import RemoteEntity, RemoteEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -49,7 +49,7 @@ class SamsungRemote(RemoteEntity):
         self._device_id = device_id
         self._device_name = device_name
         self._attr_name = device_name
-        self._attr_supported_features = 0
+        self._attr_supported_features = RemoteEntityFeature.SEND_COMMAND
         self._attr_unique_id = f"samsung_remote_{device_id}"
         self._attr_icon = "mdi:remote"
 
