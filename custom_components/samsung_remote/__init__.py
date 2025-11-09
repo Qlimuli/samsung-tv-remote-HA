@@ -19,7 +19,7 @@ from .const import (
     LOGGER,
 )
 
-PLATFORMS: Final = ["remote"]
+PLATFORMS: Final = ["remote", "button"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
