@@ -26,44 +26,101 @@ class APIMethod(Enum):
     TIZEN_LOCAL = "tizen_local"
 
 
-# Samsung TV Key Codes
+# Samsung TV Key Codes for SmartThings API
+# These are the codes that work with samsungvd.remoteControl capability
 SAMSUNG_KEY_MAP = {
-    "POWER": "KEY_POWER",
-    "HOME": "KEY_HOME",
-    "BACK": "KEY_BACK",
-    "VOLUME_UP": "KEY_VOLUME_UP",
-    "VOLUME_DOWN": "KEY_VOLUME_DOWN",
-    "CHANNEL_UP": "KEY_CH_UP",
-    "CHANNEL_DOWN": "KEY_CH_DOWN",
-    "UP": "KEY_UP",
-    "DOWN": "KEY_DOWN",
-    "LEFT": "KEY_LEFT",
-    "RIGHT": "KEY_RIGHT",
-    "ENTER": "KEY_ENTER",
-    "MENU": "KEY_MENU",
-    "SOURCE": "KEY_SOURCE",
-    "GUIDE": "KEY_GUIDE",
-    "INFO": "KEY_INFO",
-    "EXIT": "KEY_EXIT",
-    "RED": "KEY_RED",
-    "GREEN": "KEY_GREEN",
-    "YELLOW": "KEY_YELLOW",
-    "BLUE": "KEY_BLUE",
-    "0": "KEY_0",
-    "1": "KEY_1",
-    "2": "KEY_2",
-    "3": "KEY_3",
-    "4": "KEY_4",
-    "5": "KEY_5",
-    "6": "KEY_6",
-    "7": "KEY_7",
-    "8": "KEY_8",
-    "9": "KEY_9",
-    "PLAY": "KEY_PLAY",
-    "PAUSE": "KEY_PAUSE",
-    "STOP": "KEY_STOP",
-    "REWIND": "KEY_REWIND",
-    "FAST_FORWARD": "KEY_FAST_FORWARD",
+    # Power
+    "POWER": "POWER",
+    "POWEROFF": "POWEROFF",
+    
+    # Navigation
+    "UP": "UP",
+    "DOWN": "DOWN",
+    "LEFT": "LEFT",
+    "RIGHT": "RIGHT",
+    "ENTER": "ENTER",
+    "RETURN": "RETURN",
+    "BACK": "RETURN",  # Alias
+    
+    # Menu
+    "HOME": "HOME",
+    "MENU": "MENU",
+    "TOOLS": "TOOLS",
+    "INFO": "INFO",
+    "EXIT": "EXIT",
+    
+    # Volume
+    "VOLUME_UP": "VOLUP",
+    "VOLUME_DOWN": "VOLDOWN",
+    "MUTE": "MUTE",
+    "VOLUP": "VOLUP",
+    "VOLDOWN": "VOLDOWN",
+    
+    # Channel
+    "CHANNEL_UP": "CHUP",
+    "CHANNEL_DOWN": "CHDOWN",
+    "CHUP": "CHUP",
+    "CHDOWN": "CHDOWN",
+    "PRECH": "PRECH",  # Previous channel
+    
+    # Playback
+    "PLAY": "PLAY",
+    "PAUSE": "PAUSE",
+    "STOP": "STOP",
+    "REWIND": "REWIND",
+    "FAST_FORWARD": "FF",
+    "FF": "FF",
+    "REC": "REC",
+    
+    # Source
+    "SOURCE": "SOURCE",
+    "HDMI": "HDMI",
+    "HDMI1": "HDMI1",
+    "HDMI2": "HDMI2",
+    "HDMI3": "HDMI3",
+    "HDMI4": "HDMI4",
+    
+    # Guide
+    "GUIDE": "GUIDE",
+    "CH_LIST": "CH_LIST",
+    
+    # Color buttons
+    "RED": "RED",
+    "GREEN": "GREEN",
+    "YELLOW": "YELLOW",
+    "BLUE": "BLUE",
+    
+    # Numbers
+    "0": "NUM0",
+    "1": "NUM1",
+    "2": "NUM2",
+    "3": "NUM3",
+    "4": "NUM4",
+    "5": "NUM5",
+    "6": "NUM6",
+    "7": "NUM7",
+    "8": "NUM8",
+    "9": "NUM9",
+    "NUM0": "NUM0",
+    "NUM1": "NUM1",
+    "NUM2": "NUM2",
+    "NUM3": "NUM3",
+    "NUM4": "NUM4",
+    "NUM5": "NUM5",
+    "NUM6": "NUM6",
+    "NUM7": "NUM7",
+    "NUM8": "NUM8",
+    "NUM9": "NUM9",
+    
+    # Additional
+    "PICTURE_MODE": "PICTURE_MODE",
+    "SOUND_MODE": "SOUND_MODE",
+    "SLEEP": "SLEEP",
+    "ASPECT": "ASPECT",
+    "CAPTION": "CAPTION",
+    "SETTINGS": "SETTINGS",
+    "E_MANUAL": "E_MANUAL",
+    "SEARCH": "SEARCH",
 }
 
 SUPPORTED_COMMANDS = list(SAMSUNG_KEY_MAP.keys())
