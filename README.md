@@ -138,7 +138,7 @@ MIT - See LICENSE file
 
 ## Support
 
-For issues and feature requests, visit: https://github.com/v0/hacs-samsung-remote/issues
+For issues and feature requests, visit: https://github.com/Qlimuli/samsung-tv-remote-HA/issues
 
 ## Changelog
 
