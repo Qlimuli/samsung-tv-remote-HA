@@ -1,15 +1,14 @@
 """Remote entity for Samsung TV."""
-from typing import Any, Optional
-
 import asyncio
+from typing import Any
+
 from homeassistant.components.remote import RemoteEntity, RemoteEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .api.smartthings import SmartThingsAPI
-from .api.tizen_local import TizenLocalAPI
 from .const import DOMAIN, LOGGER, SUPPORTED_COMMANDS
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -27,8 +26,12 @@ async def async_setup_entry(
     )
     async_add_entities([entity])
 
+
 class SamsungRemote(RemoteEntity):
     """Samsung Smart TV remote entity."""
+
+    _attr_has_entity_name = True
+    _attr_name = None
 
     def __init__(
         self,
@@ -44,50 +47,65 @@ class SamsungRemote(RemoteEntity):
         self._api = api
         self._device_id = device_id
         self._device_name = device_name
-        self._attr_name = device_name
         self._attr_supported_features = (
             RemoteEntityFeature.SEND_COMMAND
             | RemoteEntityFeature.TURN_ON
             | RemoteEntityFeature.TURN_OFF
         )
-        self._attr_unique_id = f"samsung_remote_{device_id}"
+        self._attr_unique_id = f"{device_id}_remote"
         self._attr_icon = "mdi:remote"
-        self._attr_available = True  # Assume available initially; update in async_update if needed
+        self._attr_is_on = True  # Assume on by default
+        self._attr_available = True
 
     @property
     def device_info(self) -> dict[str, Any]:
         """Return device info."""
-        # Ideally, fetch model from API, but hardcoded for now
         return {
             "identifiers": {(DOMAIN, self._device_id)},
             "name": self._device_name,
             "manufacturer": "Samsung",
             "model": "Smart TV",
+            "sw_version": None,
         }
 
-    async def async_send_command(
-        self, command: list[str], **kwargs: Any,
-    ) -> None:
+    async def async_send_command(self, command: list[str], **kwargs: Any) -> None:
         """Send command to remote."""
-        repetition = kwargs.get("repetition", 1)
+        num_repeats = kwargs.get("num_repeats", 1)
+        delay = kwargs.get("delay_secs", 0.4)
+        
         try:
-            for _ in range(repetition):
+            for _ in range(num_repeats):
                 for cmd in command:
+                    if cmd not in SUPPORTED_COMMANDS:
+                        LOGGER.warning(
+                            f"Command '{cmd}' not in supported commands. "
+                            f"Supported: {', '.join(SUPPORTED_COMMANDS)}"
+                        )
+                    
                     success = await self._api.send_command(self._device_id, cmd)
                     if not success:
-                        LOGGER.warning(f"Command {cmd} may have failed for {self._device_name}")
-                    await asyncio.sleep(0.2)  # Small delay between commands to prevent flooding
+                        LOGGER.warning(
+                            f"Command {cmd} may have failed for {self._device_name}"
+                        )
+                    
+                    # Delay between commands
+                    if len(command) > 1 or num_repeats > 1:
+                        await asyncio.sleep(delay)
+                        
         except Exception as e:
             LOGGER.error(f"Failed to send command: {e}")
             self._attr_available = False
+            raise
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the device on."""
         await self.async_send_command(["POWER"])
+        self._attr_is_on = True
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the device off."""
-        await self.async_send_command(["POWER"])  # Assuming POWER toggles; adjust if API has separate on/off
+        await self.async_send_command(["POWER"])
+        self._attr_is_on = False
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -95,11 +113,11 @@ class SamsungRemote(RemoteEntity):
         return {
             "supported_commands": SUPPORTED_COMMANDS,
             "api_method": self._config_entry.data.get("api_method", "smartthings"),
+            "device_id": self._device_id,
         }
 
     async def async_update(self) -> None:
         """Update the entity state."""
-        # If API supports checking power state, implement here
-        # For example: self._attr_is_on = await self._api.is_on(self._device_id)
-        # self._attr_available = await self._api.is_available(self._device_id)
+        # Most Samsung TVs don't provide reliable power state via API
+        # Keeping entity available unless commands fail
         pass
