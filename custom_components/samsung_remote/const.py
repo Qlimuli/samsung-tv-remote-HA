@@ -26,71 +26,83 @@ class APIMethod(Enum):
     TIZEN_LOCAL = "tizen_local"
 
 
-# Samsung TV Key Codes for SmartThings API
-# These are the codes that work with samsungvd.remoteControl capability
+# SmartThings API supported commands (limited set)
+# Only these commands work with SmartThings samsungvd.remoteControl capability
+SMARTTHINGS_COMMANDS = {
+    "UP", "DOWN", "LEFT", "RIGHT", "OK", "BACK", "EXIT", 
+    "MENU", "HOME", "MUTE", "PLAY", "PAUSE", "STOP", 
+    "REWIND", "FF", "PLAY_BACK", "SOURCE"
+}
+
+# Samsung TV Key Codes - Maps user-friendly names to API commands
+# For SmartThings API: Only uses commands from SMARTTHINGS_COMMANDS
+# For Tizen Local API: Uses full set of commands
 SAMSUNG_KEY_MAP = {
-    # Power
-    "POWER": "POWER",
-    "POWEROFF": "POWEROFF",
-    
-    # Navigation
+    # Navigation (SmartThings compatible)
     "UP": "UP",
     "DOWN": "DOWN",
     "LEFT": "LEFT",
     "RIGHT": "RIGHT",
-    "ENTER": "ENTER",
-    "RETURN": "RETURN",
-    "BACK": "RETURN",  # Alias
+    "ENTER": "OK",  # SmartThings uses OK instead of ENTER
+    "OK": "OK",
+    "RETURN": "BACK",  # SmartThings uses BACK instead of RETURN
+    "BACK": "BACK",
     
-    # Menu
+    # Menu (SmartThings compatible)
     "HOME": "HOME",
     "MENU": "MENU",
-    "TOOLS": "TOOLS",
-    "INFO": "INFO",
     "EXIT": "EXIT",
     
-    # Volume
-    "VOLUME_UP": "VOLUP",
-    "VOLUME_DOWN": "VOLDOWN",
+    # Volume (SmartThings: only MUTE is supported)
     "MUTE": "MUTE",
-    "VOLUP": "VOLUP",
-    "VOLDOWN": "VOLDOWN",
+    "VOLUME_UP": "VOLUP",  # Only works with Tizen Local
+    "VOLUME_DOWN": "VOLDOWN",  # Only works with Tizen Local
+    "VOLUP": "VOLUP",  # Only works with Tizen Local
+    "VOLDOWN": "VOLDOWN",  # Only works with Tizen Local
     
-    # Channel
-    "CHANNEL_UP": "CHUP",
-    "CHANNEL_DOWN": "CHDOWN",
-    "CHUP": "CHUP",
-    "CHDOWN": "CHDOWN",
-    "PRECH": "PRECH",  # Previous channel
-    
-    # Playback
+    # Playback (SmartThings compatible)
     "PLAY": "PLAY",
     "PAUSE": "PAUSE",
     "STOP": "STOP",
     "REWIND": "REWIND",
     "FAST_FORWARD": "FF",
     "FF": "FF",
-    "REC": "REC",
+    "PLAY_BACK": "PLAY_BACK",
     
-    # Source
+    # Source (SmartThings compatible)
     "SOURCE": "SOURCE",
+    
+    # Power (Only works with Tizen Local)
+    "POWER": "POWER",
+    "POWEROFF": "POWEROFF",
+    
+    # Channel (Only works with Tizen Local)
+    "CHANNEL_UP": "CHUP",
+    "CHANNEL_DOWN": "CHDOWN",
+    "CHUP": "CHUP",
+    "CHDOWN": "CHDOWN",
+    "PRECH": "PRECH",
+    
+    # HDMI (Only works with Tizen Local)
     "HDMI": "HDMI",
     "HDMI1": "HDMI1",
     "HDMI2": "HDMI2",
     "HDMI3": "HDMI3",
     "HDMI4": "HDMI4",
     
-    # Guide
+    # Guide (Only works with Tizen Local)
     "GUIDE": "GUIDE",
     "CH_LIST": "CH_LIST",
+    "TOOLS": "TOOLS",
+    "INFO": "INFO",
     
-    # Color buttons
+    # Color buttons (Only works with Tizen Local)
     "RED": "RED",
     "GREEN": "GREEN",
     "YELLOW": "YELLOW",
     "BLUE": "BLUE",
     
-    # Numbers
+    # Numbers (Only works with Tizen Local)
     "0": "NUM0",
     "1": "NUM1",
     "2": "NUM2",
@@ -112,7 +124,7 @@ SAMSUNG_KEY_MAP = {
     "NUM8": "NUM8",
     "NUM9": "NUM9",
     
-    # Additional
+    # Additional (Only works with Tizen Local)
     "PICTURE_MODE": "PICTURE_MODE",
     "SOUND_MODE": "SOUND_MODE",
     "SLEEP": "SLEEP",
@@ -121,6 +133,7 @@ SAMSUNG_KEY_MAP = {
     "SETTINGS": "SETTINGS",
     "E_MANUAL": "E_MANUAL",
     "SEARCH": "SEARCH",
+    "REC": "REC",
 }
 
 SUPPORTED_COMMANDS = list(SAMSUNG_KEY_MAP.keys())
