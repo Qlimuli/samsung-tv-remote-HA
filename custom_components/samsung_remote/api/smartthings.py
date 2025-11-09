@@ -20,6 +20,7 @@ class SmartThingsAPI:
         self.base_url = "https://api.smartthings.com/v1"
         self.session: Optional[aiohttp.ClientSession] = None
         self.device_cache: dict[str, dict[str, Any]] = {}
+        self.device_capabilities: dict[str, list[str]] = {}
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session."""
@@ -91,14 +92,35 @@ class SmartThingsAPI:
             tv_devices = []
             for device in devices:
                 if self._is_tv_device(device):
-                    self.device_cache[device["deviceId"]] = device
+                    device_id = device["deviceId"]
+                    self.device_cache[device_id] = device
+                    
+                    # Cache capabilities for this device
+                    capabilities = self._get_device_capabilities(device)
+                    self.device_capabilities[device_id] = capabilities
+                    LOGGER.debug(f"Device {device_id} capabilities: {capabilities}")
+                    
                     tv_devices.append(device)
             
-            LOGGER.debug(f"Found {len(tv_devices)} TV devices")
+            LOGGER.info(f"Found {len(tv_devices)} TV devices")
             return tv_devices
         except Exception as e:
             LOGGER.error(f"Failed to fetch devices: {e}")
             raise
+
+    def _get_device_capabilities(self, device: dict[str, Any]) -> list[str]:
+        """Extract capabilities from device."""
+        capabilities = []
+        components = device.get("components", [])
+        if components and isinstance(components, list):
+            for component in components:
+                caps = component.get("capabilities", [])
+                for cap in caps:
+                    if isinstance(cap, dict):
+                        cap_id = cap.get("id", "")
+                        if cap_id:
+                            capabilities.append(cap_id)
+        return capabilities
 
     def _is_tv_device(self, device: dict[str, Any]) -> bool:
         """Check if device is a TV."""
@@ -110,15 +132,18 @@ class SmartThingsAPI:
             return True
         
         # Check capabilities
-        components = device.get("components", [])
-        if components and isinstance(components, list):
-            main_component = components[0] if components else {}
-            capabilities = main_component.get("capabilities", [])
-            capability_ids = [cap.get("id", "") for cap in capabilities if isinstance(cap, dict)]
-            
-            tv_capabilities = ["remoteControl", "mediaPlayback", "tvChannel", "audioVolume"]
-            if any(cap in capability_ids for cap in tv_capabilities):
-                return True
+        capabilities = self._get_device_capabilities(device)
+        tv_capabilities = [
+            "samsungvd.remoteControl", 
+            "samsungvd.mediaInputSource",
+            "samsungvd.ambientContent",
+            "mediaPlayback", 
+            "tvChannel", 
+            "audioVolume"
+        ]
+        
+        if any(cap in capabilities for cap in tv_capabilities):
+            return True
         
         return False
 
@@ -126,23 +151,58 @@ class SmartThingsAPI:
         """Send remote command to device."""
         try:
             key = SAMSUNG_KEY_MAP.get(command, command)
+            
+            # Get device capabilities
+            capabilities = self.device_capabilities.get(device_id, [])
+            
+            # Determine which capability to use
+            capability = None
+            if "samsungvd.remoteControl" in capabilities:
+                capability = "samsungvd.remoteControl"
+                command_name = "send"
+            elif "samsungvd.mediaInputSource" in capabilities and command in ["SOURCE", "HDMI"]:
+                capability = "samsungvd.mediaInputSource"
+                command_name = "setInputSource"
+            else:
+                # Fallback to trying common capabilities
+                LOGGER.warning(f"No remote control capability found for {device_id}, trying fallback")
+                capability = "samsungvd.remoteControl"
+                command_name = "send"
+            
             payload = {
                 "commands": [
                     {
                         "component": "main",
-                        "capability": "remoteControl",
-                        "command": "sendCommand",
-                        "arguments": [key],
+                        "capability": capability,
+                        "command": command_name,
+                        "arguments": [key] if command_name == "send" else [key],
                     }
                 ]
             }
             
+            LOGGER.debug(f"Sending to {device_id}: {payload}")
             await self._request("POST", f"/devices/{device_id}/commands", payload)
-            LOGGER.debug(f"Sent command {command} ({key}) to device {device_id}")
+            LOGGER.debug(f"Successfully sent command {command} ({key}) to device {device_id}")
             return True
+            
         except Exception as e:
             LOGGER.error(f"Failed to send command {command}: {e}")
+            
+            # Try to get more detailed device info on first failure
+            if device_id in self.device_cache:
+                device = self.device_cache[device_id]
+                LOGGER.debug(f"Device details: {device}")
+            
             return False
+
+    async def get_device_status(self, device_id: str) -> dict[str, Any]:
+        """Get device status."""
+        try:
+            response = await self._request("GET", f"/devices/{device_id}/status")
+            return response
+        except Exception as e:
+            LOGGER.error(f"Failed to get device status: {e}")
+            return {}
 
     async def validate_token(self) -> bool:
         """Validate SmartThings token."""
