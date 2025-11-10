@@ -12,6 +12,8 @@ A HACS-compatible Home Assistant custom integration for controlling Samsung Smar
 - **20+ Remote Commands** - POWER, VOLUME, CHANNEL, NUMPAD, and more
 - **Multi-language Support** - English and German translations
 <img width="307" height="828" alt="image" src="https://github.com/user-attachments/assets/fa374cb6-fc02-4bae-af7f-750e74eb93a3" />
+<img width="537" height="750" alt="image" src="https://github.com/user-attachments/assets/56fc977b-1bd8-416f-8b77-15496c83c5c4" />
+
 
 ## Installation
 
