@@ -9,561 +9,355 @@ Diese Variante zeigt die wichtigsten Funktionen in einem kompakten Layout.
 ```yaml
 type: vertical-stack
 cards:
-  # Header mit Power und Home
-  - type: grid
-    square: false
-    columns: 3
-    cards:
-      - type: button
-        entity: button.samsung_tv_power
-        name: Ein/Aus
-        show_state: false
-        
-      - type: button
-        entity: button.samsung_tv_home
-        name: Home
-        show_state: false
-        
-      - type: button
-        entity: button.samsung_tv_menu
-        name: Menü
-        show_state: false
-
-  # Navigation (D-Pad)
-  - type: grid
-    square: true
-    columns: 3
-    cards:
-      - type: button
-        show_icon: false
-        show_name: false
-        tap_action:
-          action: none
-          
-      - type: button
-        entity: button.samsung_tv_up
-        show_name: false
-        
-      - type: button
-        show_icon: false
-        show_name: false
-        tap_action:
-          action: none
-          
-      - type: button
-        entity: button.samsung_tv_left
-        show_name: false
-        
-      - type: button
-        entity: button.samsung_tv_enter
-        name: OK
-        icon: mdi:circle
-        
-      - type: button
-        entity: button.samsung_tv_right
-        show_name: false
-        
-      - type: button
-        show_icon: false
-        show_name: false
-        tap_action:
-          action: none
-          
-      - type: button
-        entity: button.samsung_tv_down
-        show_name: false
-        
-      - type: button
-        entity: button.samsung_tv_back
-        show_name: false
-
-  # Lautstärke & Kanäle
-  - type: grid
-    square: false
-    columns: 3
-    cards:
-      - type: button
-        entity: button.samsung_tv_volume_up
-        name: Vol +
-        
-      - type: button
-        entity: button.samsung_tv_mute
-        name: Stumm
-        
-      - type: button
-        entity: button.samsung_tv_channel_up
-        name: CH +
-        
-      - type: button
-        entity: button.samsung_tv_volume_down
-        name: Vol -
-        
-      - type: button
-        entity: button.samsung_tv_previous_channel
-        name: Zurück
-        icon: mdi:history
-        
-      - type: button
-        entity: button.samsung_tv_channel_down
-        name: CH -
-
-  # Playback Controls
-  - type: grid
-    square: false
-    columns: 4
-    cards:
-      - type: button
-        entity: button.samsung_tv_rewind
-        show_name: false
-        
-      - type: button
-        entity: button.samsung_tv_play
-        show_name: false
-        
-      - type: button
-        entity: button.samsung_tv_pause
-        show_name: false
-        
-      - type: button
-        entity: button.samsung_tv_fast_forward
-        show_name: false
-```
-
----
-
-## 🎯 Variante 2: Vollständige Fernbedienung
-
-Diese Variante enthält ALLE verfügbaren Funktionen.
-
-```yaml
-type: vertical-stack
-cards:
-  # Power & Hauptmenü
-  - type: grid
-    square: false
-    columns: 4
-    cards:
-      - type: button
-        entity: button.samsung_tv_power
-        name: Power
-        
-      - type: button
-        entity: button.samsung_tv_poweroff
-        name: Aus
-        
-      - type: button
-        entity: button.samsung_tv_home
-        name: Home
-        
-      - type: button
-        entity: button.samsung_tv_menu
-        name: Menü
-
-  # Navigation
-  - type: grid
-    square: true
-    columns: 3
-    cards:
-      - type: button
-        show_icon: false
-        show_name: false
-        tap_action:
-          action: none
-          
-      - type: button
-        entity: button.samsung_tv_up
-        show_name: false
-        
-      - type: button
-        show_icon: false
-        show_name: false
-        tap_action:
-          action: none
-          
-      - type: button
-        entity: button.samsung_tv_left
-        show_name: false
-        
-      - type: button
-        entity: button.samsung_tv_enter
-        name: OK
-        icon: mdi:circle
-        
-      - type: button
-        entity: button.samsung_tv_right
-        show_name: false
-        
-      - type: button
-        show_icon: false
-        show_name: false
-        tap_action:
-          action: none
-          
-      - type: button
-        entity: button.samsung_tv_down
-        show_name: false
-        
-      - type: button
-        entity: button.samsung_tv_back
-        show_name: false
-
-  # Lautstärke & Kanäle
-  - type: grid
-    square: false
-    columns: 4
-    cards:
-      - type: button
-        entity: button.samsung_tv_volume_up
-        name: Vol +
-        
-      - type: button
-        entity: button.samsung_tv_mute
-        name: Stumm
-        
-      - type: button
-        entity: button.samsung_tv_channel_up
-        name: CH +
-        
-      - type: button
-        entity: button.samsung_tv_info
-        name: Info
-        
-      - type: button
-        entity: button.samsung_tv_volume_down
-        name: Vol -
-        
-      - type: button
-        entity: button.samsung_tv_previous_channel
-        icon: mdi:history
-        show_name: false
-        
-      - type: button
-        entity: button.samsung_tv_channel_down
-        name: CH -
-        
-      - type: button
-        entity: button.samsung_tv_exit
-        name: Exit
-
-  # Playback
-  - type: grid
-    square: false
-    columns: 5
-    cards:
-      - type: button
-        entity: button.samsung_tv_rewind
-        show_name: false
-        
-      - type: button
-        entity: button.samsung_tv_play
-        show_name: false
-        
-      - type: button
-        entity: button.samsung_tv_pause
-        show_name: false
-        
-      - type: button
-        entity: button.samsung_tv_stop
-        show_name: false
-        
-      - type: button
-        entity: button.samsung_tv_fast_forward
-        show_name: false
-
-  # HDMI & Quellen
-  - type: grid
-    square: false
-    columns: 5
-    cards:
-      - type: button
-        entity: button.samsung_tv_source
-        name: Quelle
-        
-      - type: button
-        entity: button.samsung_tv_hdmi1
-        name: HDMI 1
-        
-      - type: button
-        entity: button.samsung_tv_hdmi2
-        name: HDMI 2
-        
-      - type: button
-        entity: button.samsung_tv_hdmi3
-        name: HDMI 3
-        
-      - type: button
-        entity: button.samsung_tv_hdmi4
-        name: HDMI 4
-
-  # Programmführer & Einstellungen
-  - type: grid
-    square: false
-    columns: 4
-    cards:
-      - type: button
-        entity: button.samsung_tv_guide
-        name: Guide
-        
-      - type: button
-        entity: button.samsung_tv_channel_list
-        name: Kanalliste
-        
-      - type: button
-        entity: button.samsung_tv_tools
-        name: Extras
-        
-      - type: button
-        entity: button.samsung_tv_settings
-        name: Einstellungen
-
-  # Bild & Ton
-  - type: grid
-    square: false
-    columns: 2
-    cards:
-      - type: button
-        entity: button.samsung_tv_picture_mode
-        name: Bildmodus
-        
-      - type: button
-        entity: button.samsung_tv_sound_mode
-        name: Tonmodus
-
-  # Farbtasten
-  - type: grid
-    square: false
-    columns: 4
-    cards:
-      - type: button
-        entity: button.samsung_tv_red
-        name: Rot
-        
-      - type: button
-        entity: button.samsung_tv_green
-        name: Grün
-        
-      - type: button
-        entity: button.samsung_tv_yellow
-        name: Gelb
-        
-      - type: button
-        entity: button.samsung_tv_blue
-        name: Blau
-
-  # Zifferntasten
-  - type: grid
-    square: true
-    columns: 3
-    cards:
-      - type: button
-        entity: button.samsung_tv_number_1
-        name: "1"
-        
-      - type: button
-        entity: button.samsung_tv_number_2
-        name: "2"
-        
-      - type: button
-        entity: button.samsung_tv_number_3
-        name: "3"
-        
-      - type: button
-        entity: button.samsung_tv_number_4
-        name: "4"
-        
-      - type: button
-        entity: button.samsung_tv_number_5
-        name: "5"
-        
-      - type: button
-        entity: button.samsung_tv_number_6
-        name: "6"
-        
-      - type: button
-        entity: button.samsung_tv_number_7
-        name: "7"
-        
-      - type: button
-        entity: button.samsung_tv_number_8
-        name: "8"
-        
-      - type: button
-        entity: button.samsung_tv_number_9
-        name: "9"
-        
-      - type: button
-        show_icon: false
-        show_name: false
-        tap_action:
-          action: none
-          
-      - type: button
-        entity: button.samsung_tv_number_0
-        name: "0"
-        
-      - type: button
-        show_icon: false
-        show_name: false
-        tap_action:
-          action: none
-```
-
----
-
-## 🎨 Variante 3: Moderne Kachel-Ansicht
-
-Diese Variante nutzt moderne Tile-Cards für ein sauberes Design.
-
-```yaml
-type: vertical-stack
-cards:
-  # Status & Power
-  - type: tile
-    entity: remote.samsung_tv_remote
-    name: Samsung TV
+  - type: custom:mushroom-template-card
+    primary: TV {{PLACEHOLDER}}
+    secondary: >-
+      {{ states('media_player.tv_{{PLACEHOLDER}}') | title }} | Lautstärke:
+      {{ states('sensor.tv_{{PLACEHOLDER}}_lautstarke') }}
     icon: mdi:television
-    features:
-      - type: button
-        entity: button.samsung_tv_power
+    icon_color: |-
+      {% if is_state('media_player.tv_{{PLACEHOLDER}}', 'on') %}
+        blue
+      {% else %}
+        grey
+      {% endif %}
+    tap_action:
+      action: toggle
+    entity: switch.tv_{{PLACEHOLDER}}
+    card_mod:
+      style: |
+        ha-card {
+          background: linear-gradient(135deg, rgba(30,30,45,0.95), rgba(20,20,35,0.95));
+          border-radius: 20px;
+          border: 1px solid rgba(100,100,120,0.2);
+        }
+  - type: grid
+    columns: 3
+    square: false
+    cards:
+      - type: custom:mushroom-template-card
         icon: mdi:power
-        
-  # Quick Actions
+        icon_color: red
+        tap_action:
+          action: call-service
+          service: switch.toggle
+          target:
+            entity_id: switch.tv_{{PLACEHOLDER}}
+        card_mod:
+          style: |
+            ha-card {
+              background: rgba(20,20,30,0.6);
+              border-radius: 12px;
+              height: 55px;
+              border: 1px solid rgba(255,50,50,0.3);
+            }
+      - type: custom:mushroom-template-card
+        icon: mdi:home
+        icon_color: blue
+        tap_action:
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.tv_{{PLACEHOLDER}}_home
+        card_mod:
+          style: |
+            ha-card {
+              background: rgba(20,20,30,0.6);
+              border-radius: 12px;
+              height: 55px;
+              border: 1px solid rgba(50,100,255,0.3);
+            }
+      - type: custom:mushroom-template-card
+        icon: mdi:menu
+        icon_color: blue
+        tap_action:
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.tv_{{PLACEHOLDER}}_menu
+        card_mod:
+          style: |
+            ha-card {
+              background: rgba(20,20,30,0.6);
+              border-radius: 12px;
+              height: 55px;
+              border: 1px solid rgba(50,100,255,0.3);
+            }
   - type: grid
-    square: false
-    columns: 4
-    cards:
-      - type: tile
-        entity: button.samsung_tv_home
-        show_entity_picture: false
-        vertical: true
-        
-      - type: tile
-        entity: button.samsung_tv_menu
-        vertical: true
-        
-      - type: tile
-        entity: button.samsung_tv_back
-        vertical: true
-        
-      - type: tile
-        entity: button.samsung_tv_exit
-        vertical: true
-
-  # Navigation
-  - type: grid
-    title: Navigation
-    square: true
     columns: 3
+    square: false
     cards:
-      - type: button
-        show_icon: false
+      - type: custom:mushroom-template-card
+        icon: mdi:undo
+        icon_color: orange
         tap_action:
-          action: none
-          
-      - type: tile
-        entity: button.samsung_tv_up
-        vertical: true
-        
-      - type: button
-        show_icon: false
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.tv_{{PLACEHOLDER}}_zuruck
+        card_mod:
+          style: |
+            ha-card {
+              background: rgba(20,20,30,0.6);
+              border-radius: 12px;
+              height: 55px;
+              border: 1px solid rgba(255,150,50,0.3);
+            }
+      - type: custom:mushroom-template-card
+        icon: mdi:chevron-up
+        icon_color: cyan
         tap_action:
-          action: none
-          
-      - type: tile
-        entity: button.samsung_tv_left
-        vertical: true
-        
-      - type: tile
-        entity: button.samsung_tv_enter
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.tv_{{PLACEHOLDER}}_hoch
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(135deg, rgba(60,80,100,0.9), rgba(40,60,80,0.9));
+              border-radius: 12px;
+              height: 55px;
+              border: 2px solid rgba(100,200,255,0.6);
+              box-shadow: 0 0 15px rgba(100,200,255,0.3), inset 0 0 10px rgba(100,200,255,0.1);
+            }
+      - type: custom:mushroom-template-card
+        icon: mdi:source-branch
+        icon_color: purple
+        tap_action:
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.tv_{{PLACEHOLDER}}_quelle
+        card_mod:
+          style: |
+            ha-card {
+              background: rgba(20,20,30,0.6);
+              border-radius: 12px;
+              height: 55px;
+              border: 1px solid rgba(200,100,255,0.3);
+            }
+  - type: grid
+    columns: 3
+    square: false
+    cards:
+      - type: custom:mushroom-template-card
+        icon: mdi:chevron-left
+        icon_color: cyan
+        tap_action:
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.tv_{{PLACEHOLDER}}_links
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(135deg, rgba(60,80,100,0.9), rgba(40,60,80,0.9));
+              border-radius: 12px;
+              height: 55px;
+              border: 2px solid rgba(100,200,255,0.6);
+              box-shadow: 0 0 15px rgba(100,200,255,0.3), inset 0 0 10px rgba(100,200,255,0.1);
+            }
+      - type: custom:mushroom-template-card
         icon: mdi:checkbox-blank-circle
-        vertical: true
-        
-      - type: tile
-        entity: button.samsung_tv_right
-        vertical: true
-        
-      - type: button
-        show_icon: false
+        icon_color: lime
         tap_action:
-          action: none
-          
-      - type: tile
-        entity: button.samsung_tv_down
-        vertical: true
-        
-      - type: button
-        show_icon: false
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.tv_{{PLACEHOLDER}}_bestatigen
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(135deg, rgba(80,120,80,0.95), rgba(60,100,60,0.95));
+              border-radius: 50%;
+              height: 55px;
+              border: 3px solid rgba(150,255,150,0.8);
+              box-shadow: 0 0 20px rgba(150,255,150,0.5), inset 0 0 15px rgba(150,255,150,0.2);
+            }
+      - type: custom:mushroom-template-card
+        icon: mdi:chevron-right
+        icon_color: cyan
         tap_action:
-          action: none
-
-  # Lautstärke
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.tv_{{PLACEHOLDER}}_rechts
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(135deg, rgba(60,80,100,0.9), rgba(40,60,80,0.9));
+              border-radius: 12px;
+              height: 55px;
+              border: 2px solid rgba(100,200,255,0.6);
+              box-shadow: 0 0 15px rgba(100,200,255,0.3), inset 0 0 10px rgba(100,200,255,0.1);
+            }
   - type: grid
-    title: Lautstärke & Kanäle
-    square: false
     columns: 3
-    cards:
-      - type: tile
-        entity: button.samsung_tv_volume_up
-        vertical: true
-        
-      - type: tile
-        entity: button.samsung_tv_mute
-        vertical: true
-        
-      - type: tile
-        entity: button.samsung_tv_channel_up
-        vertical: true
-        
-      - type: tile
-        entity: button.samsung_tv_volume_down
-        vertical: true
-        
-      - type: tile
-        entity: button.samsung_tv_previous_channel
-        vertical: true
-        
-      - type: tile
-        entity: button.samsung_tv_channel_down
-        vertical: true
-
-  # Playback
-  - type: grid
-    title: Wiedergabe
     square: false
-    columns: 5
     cards:
-      - type: tile
-        entity: button.samsung_tv_rewind
-        vertical: true
-        
-      - type: tile
-        entity: button.samsung_tv_play
-        vertical: true
-        
-      - type: tile
-        entity: button.samsung_tv_pause
-        vertical: true
-        
-      - type: tile
-        entity: button.samsung_tv_stop
-        vertical: true
-        
-      - type: tile
-        entity: button.samsung_tv_fast_forward
-        vertical: true
+      - type: custom:mushroom-template-card
+        icon: mdi:volume-mute
+        icon_color: grey
+        tap_action:
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.tv_{{PLACEHOLDER}}_stumm
+        card_mod:
+          style: |
+            ha-card {
+              background: rgba(20,20,30,0.6);
+              border-radius: 12px;
+              height: 55px;
+              border: 1px solid rgba(150,150,150,0.3);
+            }
+      - type: custom:mushroom-template-card
+        icon: mdi:chevron-down
+        icon_color: cyan
+        tap_action:
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.tv_{{PLACEHOLDER}}_runter
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(135deg, rgba(60,80,100,0.9), rgba(40,60,80,0.9));
+              border-radius: 12px;
+              height: 55px;
+              border: 2px solid rgba(100,200,255,0.6);
+              box-shadow: 0 0 15px rgba(100,200,255,0.3), inset 0 0 10px rgba(100,200,255,0.1);
+            }
+      - type: custom:mushroom-template-card
+        icon: mdi:exit-to-app
+        icon_color: red
+        tap_action:
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.tv_{{PLACEHOLDER}}_beenden
+        card_mod:
+          style: |
+            ha-card {
+              background: rgba(20,20,30,0.6);
+              border-radius: 12px;
+              height: 55px;
+              border: 1px solid rgba(255,50,50,0.3);
+            }
+  - type: grid
+    columns: 4
+    square: false
+    cards:
+      - type: custom:mushroom-template-card
+        icon: mdi:play
+        icon_color: green
+        tap_action:
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.tv_{{PLACEHOLDER}}_abspielen
+        card_mod:
+          style: |
+            ha-card {
+              background: rgba(20,20,30,0.6);
+              border-radius: 12px;
+              height: 50px;
+              border: 1px solid rgba(50,255,50,0.3);
+            }
+      - type: custom:mushroom-template-card
+        icon: mdi:pause
+        icon_color: yellow
+        tap_action:
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.tv_{{PLACEHOLDER}}_pause
+        card_mod:
+          style: |
+            ha-card {
+              background: rgba(20,20,30,0.6);
+              border-radius: 12px;
+              height: 50px;
+              border: 1px solid rgba(255,200,50,0.3);
+            }
+      - type: custom:mushroom-template-card
+        icon: mdi:stop
+        icon_color: red
+        tap_action:
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.tv_{{PLACEHOLDER}}_stopp
+        card_mod:
+          style: |
+            ha-card {
+              background: rgba(20,20,30,0.6);
+              border-radius: 12px;
+              height: 50px;
+              border: 1px solid rgba(255,50,50,0.3);
+            }
+      - type: custom:mushroom-template-card
+        icon: mdi:record
+        icon_color: red
+        card_mod:
+          style: |
+            ha-card {
+              background: rgba(20,20,30,0.6);
+              border-radius: 12px;
+              height: 50px;
+              border: 1px solid rgba(255,50,50,0.3);
+            }
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - type: custom:mushroom-template-card
+        icon: mdi:rewind
+        icon_color: blue
+        tap_action:
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.tv_{{PLACEHOLDER}}_zuruckspulen
+        card_mod:
+          style: |
+            ha-card {
+              background: rgba(20,20,30,0.6);
+              border-radius: 12px;
+              height: 50px;
+              border: 1px solid rgba(50,100,255,0.3);
+            }
+      - type: custom:mushroom-template-card
+        icon: mdi:fast-forward
+        icon_color: blue
+        tap_action:
+          action: call-service
+          service: button.press
+          target:
+            entity_id: button.tv_{{PLACEHOLDER}}_vorspulen
+        card_mod:
+          style: |
+            ha-card {
+              background: rgba(20,20,30,0.6);
+              border-radius: 12px;
+              height: 50px;
+              border: 1px solid rgba(50,100,255,0.3);
+            }
+card_mod:
+  style: |
+    ha-card {
+      background: linear-gradient(180deg, rgba(15,15,25,0.98), rgba(25,25,35,0.98));
+      border-radius: 20px;
+      padding: 8px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
 ```
 
 ---
 
 ## 📱 Installation
 
-### Schritt 1: Entity-Namen anpassen
-
-Ersetze in den YAML-Konfigurationen:
-- `samsung_tv` mit dem Namen deines TV-Geräts aus der Integration
-- Beispiel: Wenn dein TV "Wohnzimmer TV" heißt, wird aus `button.samsung_tv_power` → `button.wohnzimmer_tv_power`
-
-### Schritt 2: Dashboard hinzufügen
+### Dashboard hinzufügen
 
 1. Gehe zu **Einstellungen** → **Dashboards**
 2. Öffne dein Dashboard oder erstelle ein neues
@@ -574,10 +368,6 @@ Ersetze in den YAML-Konfigurationen:
 7. Füge sie in den Editor ein
 8. Klicke **Speichern**
 
-### Schritt 3: Dashboard speichern
-
-Klicke oben rechts auf **Fertig**
-
 ---
 
 ## 🎯 Tipps
@@ -587,77 +377,3 @@ Klicke oben rechts auf **Fertig**
 Gehe zu **Einstellungen** → **Geräte & Dienste** → **Integrationen** → **Samsung Remote**
 
 Klicke auf dein TV-Gerät, dort siehst du alle verfügbaren Button-Entities.
-
-### Anpassungen
-
-**Farben ändern:**
-```yaml
-- type: button
-  entity: button.samsung_tv_red
-  icon_color: red
-```
-
-**Größe ändern:**
-```yaml
-- type: grid
-  columns: 5  # Mehr Spalten = kleinere Buttons
-```
-
-**Titel hinzufügen:**
-```yaml
-- type: grid
-  title: Lautstärke
-  columns: 3
-```
-
----
-
-## 🚀 Erweiterte Optionen
-
-### Conditional Card (nur zeigen wenn TV an ist)
-
-```yaml
-type: conditional
-conditions:
-  - entity: remote.samsung_tv_remote
-    state: "on"
-card:
-  # Hier eine der Remote-Konfigurationen von oben einfügen
-```
-
-### Mit Custom Card (Universal Remote Card via HACS)
-
-Falls du HACS installiert hast:
-
-1. HACS öffnen
-2. Frontend → Suche "Universal Remote Card"
-3. Installieren
-
-Dann kannst du verwenden:
-```yaml
-type: custom:universal-remote-card
-remote_id: remote.samsung_tv_remote
-rows:
-  - - power
-  - - back
-    - home
-    - menu
-  - - touchpad
-  - - volume_down
-    - volume_mute
-    - volume_up
-```
-
----
-
-## ❓ Fehlerbehebung
-
-**Buttons werden nicht angezeigt:**
-- Prüfe, ob die Integration korrekt geladen ist
-- Stelle sicher, dass die Entity-Namen korrekt sind
-- Neustart von Home Assistant kann helfen
-
-**Buttons funktionieren nicht:**
-- Teste erst die Buttons einzeln unter **Entwicklerwerkzeuge** → **Dienste**
-- Prüfe die Home Assistant Logs auf Fehler
-- Stelle sicher, dass dein TV eingeschaltet und im Netzwerk erreichbar ist
