@@ -29,6 +29,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
+    @staticmethod
+    def async_get_options_flow(config_entry):
+        """Get the options flow for this handler."""
+        return OptionsFlowHandler(config_entry)
+
     def __init__(self) -> None:
         """Initialize config flow."""
         self.api_method = DEFAULT_API_METHOD
@@ -224,6 +229,120 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             title=kwargs[CONF_DEVICE_NAME],
             data=entry_data,
         )
+
+
+class OptionsFlowHandler(config_entries.OptionsFlow):
+    """Handle options flow for Samsung Remote."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        """Initialize options flow."""
+        self.config_entry = config_entry
+
+    async def async_step_init(
+        self, user_input: Optional[dict[str, Any]] = None
+    ) -> FlowResult:
+        """Manage the options."""
+        errors: dict[str, str] = {}
+        
+        api_method = self.config_entry.data.get(CONF_API_METHOD, "smartthings")
+        
+        if user_input is not None:
+            # Update based on API method
+            if api_method == "smartthings":
+                token = user_input.get(CONF_SMARTTHINGS_TOKEN, "").strip()
+                
+                if token:
+                    # Validate new token
+                    try:
+                        api = SmartThingsAPI(self.hass, token)
+                        if await api.validate_token():
+                            await api.close()
+                            # Update config entry with new token
+                            self.hass.config_entries.async_update_entry(
+                                self.config_entry,
+                                data={**self.config_entry.data, CONF_SMARTTHINGS_TOKEN: token},
+                            )
+                            return self.async_create_entry(title="", data={})
+                        else:
+                            errors["base"] = "invalid_token"
+                            await api.close()
+                    except Exception as e:
+                        LOGGER.error(f"Token validation error: {e}")
+                        errors["base"] = "connection_error"
+            else:
+                # Tizen local options
+                ip = user_input.get(CONF_LOCAL_IP, "").strip()
+                psk = user_input.get(CONF_LOCAL_PSK, "").strip()
+                
+                if ip:
+                    try:
+                        api = TizenLocalAPI(ip, psk)
+                        if await api.validate_connection():
+                            await api.close()
+                            # Update config entry
+                            self.hass.config_entries.async_update_entry(
+                                self.config_entry,
+                                data={
+                                    **self.config_entry.data,
+                                    CONF_LOCAL_IP: ip,
+                                    CONF_LOCAL_PSK: psk,
+                                },
+                            )
+                            return self.async_create_entry(title="", data={})
+                        else:
+                            errors["base"] = "connection_failed"
+                            await api.close()
+                    except Exception as e:
+                        LOGGER.error(f"Connection validation error: {e}")
+                        errors["base"] = "connection_error"
+        
+        # Show form based on API method
+        if api_method == "smartthings":
+            current_token = self.config_entry.data.get(CONF_SMARTTHINGS_TOKEN, "")
+            # Show masked token for security
+            masked_token = f"{'*' * (len(current_token) - 8)}{current_token[-8:]}" if len(current_token) > 8 else "***"
+            
+            return self.async_show_form(
+                step_id="init",
+                data_schema=vol.Schema(
+                    {
+                        vol.Required(
+                            CONF_SMARTTHINGS_TOKEN,
+                            description={"suggested_value": masked_token},
+                        ): str,
+                    }
+                ),
+                errors=errors,
+                description_placeholders={
+                    "current_method": "SmartThings API",
+                    "info": "Geben Sie einen neuen SmartThings Token ein",
+                },
+            )
+        else:
+            # Tizen local options
+            current_ip = self.config_entry.data.get(CONF_LOCAL_IP, "")
+            current_psk = self.config_entry.data.get(CONF_LOCAL_PSK, "")
+            
+            return self.async_show_form(
+                step_id="init",
+                data_schema=vol.Schema(
+                    {
+                        vol.Required(
+                            CONF_LOCAL_IP,
+                            description={"suggested_value": current_ip},
+                        ): str,
+                        vol.Optional(
+                            CONF_LOCAL_PSK,
+                            description={"suggested_value": current_psk},
+                        ): str,
+                    }
+                ),
+                errors=errors,
+                description_placeholders={
+                    "current_method": "Lokale Tizen-Verbindung",
+                    "info": "IP-Adresse oder PSK aktualisieren",
+                },
+            )
 
 
 class CannotConnect(HomeAssistantError):
