@@ -21,6 +21,8 @@ class SmartThingsAPI:
         self.session: Optional[aiohttp.ClientSession] = None
         self.device_cache: dict[str, dict[str, Any]] = {}
         self.device_capabilities: dict[str, list[str]] = {}
+        self._command_lock = asyncio.Lock()
+        self._last_command_time = 0.0
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session."""
@@ -155,52 +157,64 @@ class SmartThingsAPI:
         
         Note: SmartThings only supports a limited set of commands.
         Commands not in SMARTTHINGS_COMMANDS will be logged as unsupported.
+        
+        This method uses a lock to prevent command flooding and ensures
+        a minimum delay between consecutive commands.
         """
-        try:
-            key = SAMSUNG_KEY_MAP.get(command, command)
-            
-            # Check if command is supported by SmartThings
-            if key not in SMARTTHINGS_COMMANDS:
-                LOGGER.warning(
-                    f"Command '{command}' (key: {key}) is not supported by SmartThings API. "
-                    f"This command only works with Tizen Local API. "
-                    f"Supported SmartThings commands: {', '.join(sorted(SMARTTHINGS_COMMANDS))}"
-                )
+        async with self._command_lock:
+            try:
+                import time
+                current_time = time.time()
+                time_since_last = current_time - self._last_command_time
+                min_delay = 0.3
+                
+                if time_since_last < min_delay:
+                    delay_needed = min_delay - time_since_last
+                    LOGGER.debug(f"Throttling: waiting {delay_needed:.2f}s before sending command")
+                    await asyncio.sleep(delay_needed)
+                
+                key = SAMSUNG_KEY_MAP.get(command, command)
+                
+                if key not in SMARTTHINGS_COMMANDS:
+                    LOGGER.warning(
+                        f"Command '{command}' (key: {key}) is not supported by SmartThings API. "
+                        f"This command only works with Tizen Local API. "
+                        f"Supported SmartThings commands: {', '.join(sorted(SMARTTHINGS_COMMANDS))}"
+                    )
+                    return False
+                
+                payload = {
+                    "commands": [
+                        {
+                            "component": "main",
+                            "capability": "samsungvd.remoteControl",
+                            "command": "send",
+                            "arguments": [key]
+                        }
+                    ]
+                }
+                
+                LOGGER.debug(f"Sending command to {device_id}: capability=samsungvd.remoteControl, command=send, key={key}")
+                
+                await self._request("POST", f"/devices/{device_id}/commands", payload)
+                self._last_command_time = time.time()
+                LOGGER.debug(f"Successfully sent command {command} (key: {key})")
+                return True
+                
+            except Exception as e:
+                error_msg = str(e)
+                LOGGER.error(f"Failed to send command {command} (key: {key}): {error_msg}")
+                
+                if "422" in error_msg or "ConstraintViolationError" in error_msg:
+                    LOGGER.error(
+                        f"API rejected command. This might mean:\n"
+                        f"1. The key code '{key}' is not supported by SmartThings\n"
+                        f"2. The TV is offline\n"
+                        f"3. The capability format is wrong\n"
+                        f"Supported commands: {', '.join(sorted(SMARTTHINGS_COMMANDS))}"
+                    )
+                
                 return False
-            
-            # Samsung TVs use samsungvd.remoteControl capability
-            payload = {
-                "commands": [
-                    {
-                        "component": "main",
-                        "capability": "samsungvd.remoteControl",
-                        "command": "send",
-                        "arguments": [key]
-                    }
-                ]
-            }
-            
-            LOGGER.debug(f"Sending command to {device_id}: capability=samsungvd.remoteControl, command=send, key={key}")
-            
-            await self._request("POST", f"/devices/{device_id}/commands", payload)
-            LOGGER.debug(f"Successfully sent command {command} (key: {key})")
-            return True
-            
-        except Exception as e:
-            error_msg = str(e)
-            LOGGER.error(f"Failed to send command {command} (key: {key}): {error_msg}")
-            
-            # Log more details on first failure to help debug
-            if "422" in error_msg or "ConstraintViolationError" in error_msg:
-                LOGGER.error(
-                    f"API rejected command. This might mean:\n"
-                    f"1. The key code '{key}' is not supported by SmartThings\n"
-                    f"2. The TV is offline\n"
-                    f"3. The capability format is wrong\n"
-                    f"Supported commands: {', '.join(sorted(SMARTTHINGS_COMMANDS))}"
-                )
-            
-            return False
 
     async def get_device_status(self, device_id: str) -> dict[str, Any]:
         """Get device status."""
