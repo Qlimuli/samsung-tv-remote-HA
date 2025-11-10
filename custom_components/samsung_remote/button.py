@@ -10,45 +10,10 @@ from .const import DOMAIN, LOGGER
 
 
 BUTTON_COMMANDS = {
-    "power": {
-        "command": "POWER",
-        "icon": "mdi:power",
-        "translation_key": "power",
-    },
-    "poweroff": {
-        "command": "POWEROFF",
-        "icon": "mdi:power-off",
-        "translation_key": "poweroff",
-    },
-    "volume_up": {
-        "command": "VOLUP",
-        "icon": "mdi:volume-plus",
-        "translation_key": "volume_up",
-    },
-    "volume_down": {
-        "command": "VOLDOWN",
-        "icon": "mdi:volume-minus",
-        "translation_key": "volume_down",
-    },
     "mute": {
         "command": "MUTE",
         "icon": "mdi:volume-mute",
         "translation_key": "mute",
-    },
-    "channel_up": {
-        "command": "CHUP",
-        "icon": "mdi:chevron-up",
-        "translation_key": "channel_up",
-    },
-    "channel_down": {
-        "command": "CHDOWN",
-        "icon": "mdi:chevron-down",
-        "translation_key": "channel_down",
-    },
-    "previous_channel": {
-        "command": "PRECH",
-        "icon": "mdi:history",
-        "translation_key": "previous_channel",
     },
     "home": {
         "command": "HOME",
@@ -120,135 +85,15 @@ BUTTON_COMMANDS = {
         "icon": "mdi:fast-forward",
         "translation_key": "fast_forward",
     },
+    "play_back": {
+        "command": "PLAY_BACK",
+        "icon": "mdi:skip-backward",
+        "translation_key": "play_back",
+    },
     "source": {
         "command": "SOURCE",
         "icon": "mdi:video-input-hdmi",
         "translation_key": "source",
-    },
-    "hdmi1": {
-        "command": "HDMI1",
-        "icon": "mdi:video-input-hdmi",
-        "translation_key": "hdmi1",
-    },
-    "hdmi2": {
-        "command": "HDMI2",
-        "icon": "mdi:video-input-hdmi",
-        "translation_key": "hdmi2",
-    },
-    "hdmi3": {
-        "command": "HDMI3",
-        "icon": "mdi:video-input-hdmi",
-        "translation_key": "hdmi3",
-    },
-    "hdmi4": {
-        "command": "HDMI4",
-        "icon": "mdi:video-input-hdmi",
-        "translation_key": "hdmi4",
-    },
-    "guide": {
-        "command": "GUIDE",
-        "icon": "mdi:television-guide",
-        "translation_key": "guide",
-    },
-    "channel_list": {
-        "command": "CH_LIST",
-        "icon": "mdi:format-list-numbered",
-        "translation_key": "channel_list",
-    },
-    "tools": {
-        "command": "TOOLS",
-        "icon": "mdi:tools",
-        "translation_key": "tools",
-    },
-    "info": {
-        "command": "INFO",
-        "icon": "mdi:information",
-        "translation_key": "info",
-    },
-    "settings": {
-        "command": "SETTINGS",
-        "icon": "mdi:cog",
-        "translation_key": "settings",
-    },
-    "picture_mode": {
-        "command": "PICTURE_MODE",
-        "icon": "mdi:image-auto-adjust",
-        "translation_key": "picture_mode",
-    },
-    "sound_mode": {
-        "command": "SOUND_MODE",
-        "icon": "mdi:speaker",
-        "translation_key": "sound_mode",
-    },
-    "number_0": {
-        "command": "NUM0",
-        "icon": "mdi:numeric-0",
-        "translation_key": "number_0",
-    },
-    "number_1": {
-        "command": "NUM1",
-        "icon": "mdi:numeric-1",
-        "translation_key": "number_1",
-    },
-    "number_2": {
-        "command": "NUM2",
-        "icon": "mdi:numeric-2",
-        "translation_key": "number_2",
-    },
-    "number_3": {
-        "command": "NUM3",
-        "icon": "mdi:numeric-3",
-        "translation_key": "number_3",
-    },
-    "number_4": {
-        "command": "NUM4",
-        "icon": "mdi:numeric-4",
-        "translation_key": "number_4",
-    },
-    "number_5": {
-        "command": "NUM5",
-        "icon": "mdi:numeric-5",
-        "translation_key": "number_5",
-    },
-    "number_6": {
-        "command": "NUM6",
-        "icon": "mdi:numeric-6",
-        "translation_key": "number_6",
-    },
-    "number_7": {
-        "command": "NUM7",
-        "icon": "mdi:numeric-7",
-        "translation_key": "number_7",
-    },
-    "number_8": {
-        "command": "NUM8",
-        "icon": "mdi:numeric-8",
-        "translation_key": "number_8",
-    },
-    "number_9": {
-        "command": "NUM9",
-        "icon": "mdi:numeric-9",
-        "translation_key": "number_9",
-    },
-    "red": {
-        "command": "RED",
-        "icon": "mdi:alpha-r-circle",
-        "translation_key": "red",
-    },
-    "green": {
-        "command": "GREEN",
-        "icon": "mdi:alpha-g-circle",
-        "translation_key": "green",
-    },
-    "yellow": {
-        "command": "YELLOW",
-        "icon": "mdi:alpha-y-circle",
-        "translation_key": "yellow",
-    },
-    "blue": {
-        "command": "BLUE",
-        "icon": "mdi:alpha-b-circle",
-        "translation_key": "blue",
     },
 }
 
