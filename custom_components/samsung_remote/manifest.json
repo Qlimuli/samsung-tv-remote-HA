@@ -3,10 +3,10 @@
   "name": "Samsung Remote",
   "codeowners": ["@v0-samsung-remote"],
   "config_flow": true,
-  "documentation": "https://github.com/v0/hacs-samsung-remote",
+  "documentation": "https://github.com/Qlimuli/hacs-samsung-remote",
   "integration_type": "device",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/v0/hacs-samsung-remote/issues",
+  "issue_tracker": "https://github.com/Qlimuli/samsung-remote/issues",
   "requirements": ["aiohttp>=3.8.0"],
   "version": "1.0.0"
 }
