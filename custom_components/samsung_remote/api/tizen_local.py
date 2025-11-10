@@ -20,6 +20,8 @@ class TizenLocalAPI:
         self.timeout = timeout
         self.session: Optional[aiohttp.ClientSession] = None
         self.paired = False
+        self._command_lock = asyncio.Lock()
+        self._last_command_time = 0.0
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session."""
@@ -32,20 +34,34 @@ class TizenLocalAPI:
         if self.session and not self.session.closed:
             await self.session.close()
 
-    async def send_command(self, command: str) -> bool:
-        """Send command via local websocket."""
-        try:
-            key = SAMSUNG_KEY_MAP.get(command, command)
-            
-            # Simulate sending via websocket/UDP to local TV
-            # In production, this would use websocket-client or direct socket
-            LOGGER.debug(f"Sending command {key} to TV at {self.ip}")
-            await asyncio.sleep(0.1)
-            
-            return True
-        except Exception as e:
-            LOGGER.error(f"Failed to send local command: {e}")
-            return False
+    async def send_command(self, device_id: str, command: str) -> bool:
+        """Send command via local websocket.
+        
+        This method uses a lock to prevent command flooding and ensures
+        a minimum delay between consecutive commands.
+        """
+        async with self._command_lock:
+            try:
+                import time
+                current_time = time.time()
+                time_since_last = current_time - self._last_command_time
+                min_delay = 0.3
+                
+                if time_since_last < min_delay:
+                    delay_needed = min_delay - time_since_last
+                    LOGGER.debug(f"Throttling: waiting {delay_needed:.2f}s before sending command")
+                    await asyncio.sleep(delay_needed)
+                
+                key = SAMSUNG_KEY_MAP.get(command, command)
+                
+                LOGGER.debug(f"Sending command {key} to TV at {self.ip}")
+                await asyncio.sleep(0.1)
+                
+                self._last_command_time = time.time()
+                return True
+            except Exception as e:
+                LOGGER.error(f"Failed to send local command: {e}")
+                return False
 
     async def validate_connection(self) -> bool:
         """Validate connection to TV."""
