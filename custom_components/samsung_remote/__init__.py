@@ -52,6 +52,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 token_expires=token_expires,
             )
 
+            if refresh_token:
+                LOGGER.info("SmartThings OAuth configured with refresh token - tokens will auto-refresh")
+            else:
+                LOGGER.warning("SmartThings configured without refresh token - access token will expire in 24 hours")
+
             # Validate token
             if not await api.validate_token():
                 raise ConfigEntryNotReady("Invalid SmartThings token")

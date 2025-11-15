@@ -4,13 +4,14 @@ A HACS-compatible Home Assistant custom integration for controlling Samsung Smar
 
 ## Features
 
-- **SmartThings API Support** (Recommended) - Cloud-based control via SmartThings
+- **SmartThings API Support** (Recommended) - Cloud-based control via SmartThings with OAuth token auto-refresh
 - **Local Tizen Support** (Fallback) - Direct control over local network
 - **UI Configuration Flow** - No YAML configuration needed
 - **Standard remote.send_command Service** - Compatible with automations and voice assistants
-- **Secure Token Storage** - Personal access tokens stored securely
-- **15+ Remote Commands** - POWER, NAVIGATION-PAD, HOME and more
+- **Secure Token Storage** - OAuth refresh tokens with automatic renewal
+- **40+ Remote Commands** - POWER, NAVIGATION, PLAYBACK, and more
 - **Multi-language Support** - English and German translations
+- **Automatic Token Refresh** - OAuth tokens automatically renewed before expiry
 <img width="307" height="828" alt="image" src="https://github.com/user-attachments/assets/fa374cb6-fc02-4bae-af7f-750e74eb93a3" />
 <img width="537" height="750" alt="image" src="https://github.com/user-attachments/assets/56fc977b-1bd8-416f-8b77-15496c83c5c4" />
 
@@ -38,16 +39,29 @@ A HACS-compatible Home Assistant custom integration for controlling Samsung Smar
 
 ### SmartThings Method (Recommended)
 
+The integration now supports **OAuth 2.0 with automatic token refresh**. This means tokens never expire!
+
+#### Option A: New Setup (OAuth - Recommended)
+
+1. In Home Assistant, go to Settings > Devices & Services > Create Integration
+2. Search for "Samsung Remote"
+3. Select "SmartThings API" as connection method
+4. You'll be asked for:
+   - **Access Token**: Your current OAuth access token
+   - **Refresh Token**: Your OAuth refresh token for automatic renewal
+5. Select your Samsung TV from the list
+6. Done! Tokens will auto-refresh every 24 hours
+
+#### Option B: Existing PAT Token (Legacy)
+
+If you have an existing Personal Access Token that still works:
+
 1. Go to https://account.smartthings.com/tokens
-2. Generate a new Personal Access Token with the following scopes:
-   - `devices:read`
-   - `devices:execute`
-3. In Home Assistant, go to Settings > Devices & Services > Create Integration
-4. Search for "Samsung Remote"
-5. Select "SmartThings API" as connection method
-6. Paste your token
-7. Select your Samsung TV from the list
-8. Done!
+2. Copy your PAT token
+3. In Home Assistant setup, paste it as both access token and leave refresh token empty
+4. **Note**: New PATs expire after 24 hours - upgrade to OAuth tokens for automatic renewal
+
+See **docs/SMARTTHINGS_SETUP.md** for detailed instructions on obtaining OAuth tokens.
 
 ### Local Tizen Method
 
@@ -103,21 +117,51 @@ automation:
 
 ## Supported Commands
 
-- **Power**: POWER
+**SmartThings API** (Limited set):
+- **Navigation**: UP, DOWN, LEFT, RIGHT, OK, BACK, HOME, MENU, EXIT
+- **Volume**: MUTE
+- **Playback**: PLAY, PAUSE, STOP, REWIND, FF, PLAY_BACK
+- **Source**: SOURCE
+
+**Local Tizen API** (Full set - 40+ commands):
+- All SmartThings commands plus:
+- **Power**: POWER, POWEROFF
 - **Volume**: VOLUME_UP, VOLUME_DOWN
-- **Channel**: CHANNEL_UP, CHANNEL_DOWN
-- **Navigation**: UP, DOWN, LEFT, RIGHT, ENTER, BACK, HOME
+- **Channel**: CHANNEL_UP, CHANNEL_DOWN, PRECH
+- **HDMI**: HDMI, HDMI1-4
 - **Numpad**: 0-9
-- **Playback**: PLAY, PAUSE, STOP, REWIND, FAST_FORWARD
 - **Color Buttons**: RED, GREEN, YELLOW, BLUE
-- **Special**: SOURCE, GUIDE, INFO, MENU, EXIT
+- **Special**: GUIDE, CH_LIST, TOOLS, INFO, PICTURE_MODE, SOUND_MODE, SLEEP, ASPECT, CAPTION, SETTINGS, E_MANUAL, SEARCH, REC
+
+## Token Refresh
+
+### Automatic Token Refresh
+
+With OAuth tokens, the integration automatically:
+1. Checks token expiry before each API call
+2. Refreshes tokens 5 minutes before expiry
+3. Updates stored tokens securely
+4. **You never need to do anything!**
+
+### Manual Token Refresh
+
+If needed, you can manually refresh tokens:
+
+\`\`\`yaml
+service: samsung_remote.refresh_oauth_token
+data:
+  entry_id: "your_config_entry_id"
+\`\`\`
+
+See **docs/TOKEN_REFRESH_GUIDE.md** for detailed technical information.
 
 ## Troubleshooting
 
 ### "Invalid SmartThings token"
-- Verify the token is still active at https://account.smartthings.com/tokens
-- Regenerate a new token if needed
-- Ensure token has `devices:read` and `devices:execute` scopes
+- Verify your OAuth tokens are still active
+- Tokens are automatically refreshed - this usually means a connectivity issue
+- Check your home internet connection
+- Verify TV is still in your SmartThings account
 
 ### "No Samsung TVs found"
 - Verify TV is added to your SmartThings account
@@ -130,10 +174,11 @@ automation:
 - Check firewall isn't blocking port 8001
 - Try enabling "Remote Management" on TV settings
 
-### Commands not working
-- Verify remote entity exists in Home Assistant
-- Check logs for error messages: Settings > System > Logs
-- Try command via Developer Tools > Services
+### Token keeps expiring (SmartThings)
+- This should NOT happen with OAuth refresh tokens
+- Check logs: Settings > System > Logs
+- If still failing, regenerate new tokens
+- See docs/TOKEN_REFRESH_GUIDE.md for troubleshooting
 
 ## License
 

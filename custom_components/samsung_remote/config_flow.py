@@ -84,30 +84,36 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             try:
-                token_input = user_input[CONF_SMARTTHINGS_TOKEN].strip()
-                if not token_input:
+                access_token = user_input[CONF_SMARTTHINGS_ACCESS_TOKEN].strip()
+                refresh_token = user_input.get(CONF_SMARTTHINGS_REFRESH_TOKEN, "").strip()
+                
+                if not access_token:
                     errors["base"] = "invalid_token"
                     return self.async_show_form(
                         step_id="smartthings",
                         data_schema=vol.Schema(
-                            {vol.Required(CONF_SMARTTHINGS_TOKEN): str}
+                            {
+                                vol.Required(CONF_SMARTTHINGS_ACCESS_TOKEN): str,
+                                vol.Optional(CONF_SMARTTHINGS_REFRESH_TOKEN): str,
+                            }
                         ),
                         errors=errors,
                         description_placeholders={
-                            "token_info": "IMPORTANT: SmartThings PAT tokens expire after 24 hours! "
-                            "Use an OAuth refresh token instead. "
-                            "See documentation for how to obtain a long-lived refresh token."
+                            "token_info": "SmartThings OAuth Tokens:\n"
+                            "- Access Token: Required. Used to make API calls. Expires in 24 hours.\n"
+                            "- Refresh Token: REQUIRED for automatic renewal! Used to get a new access token without re-authentication.\n\n"
+                            "Both tokens are needed for permanent token renewal."
                         },
                     )
 
                 self.smartthings_api = SmartThingsAPI(
                     self.hass,
-                    access_token=token_input,
-                    refresh_token=None,  # Start without refresh token
-                    token_expires=None,
+                    access_token=access_token,
+                    refresh_token=refresh_token,
+                    token_expires=time.time() + 86400,
                 )
 
-                # Validate token
+                # Validate tokens
                 if not await self.smartthings_api.validate_token():
                     errors["base"] = "invalid_token"
                 else:
@@ -116,9 +122,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     if not self.devices:
                         errors["base"] = "no_devices_found"
                     else:
-                        # If validation succeeded, store token
-                        self.smartthings_access_token = token_input
-                        self.smartthings_refresh_token = None  # No refresh token provided
+                        # If validation succeeded, store tokens
+                        self.smartthings_access_token = access_token
+                        self.smartthings_refresh_token = refresh_token
                         self.smartthings_token_expires = time.time() + 86400
 
                         # Clean up API before proceeding
@@ -135,13 +141,19 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="smartthings",
             data_schema=vol.Schema(
-                {vol.Required(CONF_SMARTTHINGS_TOKEN): str}
+                {
+                    vol.Required(CONF_SMARTTHINGS_ACCESS_TOKEN): str,
+                    vol.Optional(CONF_SMARTTHINGS_REFRESH_TOKEN): str,
+                }
             ),
             errors=errors,
             description_placeholders={
-                "token_help": "IMPORTANT: PAT tokens from https://account.smartthings.com/tokens expire after 24 hours. "
-                "For a permanent solution, you need an OAuth refresh token. "
-                "See the documentation for instructions on setting up a long-lived token."
+                "token_help": "SmartThings OAuth Setup:\n"
+                "1. Access Token: Your current OAuth access token (expires in 24 hours)\n"
+                "2. Refresh Token: Your OAuth refresh token (used to automatically renew access token)\n\n"
+                "IMPORTANT: Both tokens are required for automatic token renewal!\n"
+                "Without a refresh token, you'll need to update the access token manually every 24 hours.\n\n"
+                "See documentation for instructions on obtaining these tokens."
             },
         )
 
@@ -285,23 +297,26 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         if user_input is not None:
             # Update based on API method
             if api_method == "smartthings":
-                token = user_input.get(CONF_SMARTTHINGS_TOKEN, "").strip()
+                access_token = user_input.get(CONF_SMARTTHINGS_ACCESS_TOKEN, "").strip()
+                refresh_token = user_input.get(CONF_SMARTTHINGS_REFRESH_TOKEN, "").strip()
 
-                if token:
-                    # Validate new token
+                if access_token:
+                    # Validate new tokens
                     try:
                         api = SmartThingsAPI(
                             self.hass,
-                            access_token=token,
-                            refresh_token=None,
+                            access_token=access_token,
+                            refresh_token=refresh_token if refresh_token else None,
                         )
                         if await api.validate_token():
                             await api.close()
-                            # Update config entry with new token
+                            # Update config entry with new tokens
                             new_data = {**self.config_entry.data}
-                            new_data[CONF_SMARTTHINGS_ACCESS_TOKEN] = token
-                            new_data[CONF_SMARTTHINGS_REFRESH_TOKEN] = None
-                            new_data[CONF_SMARTTHINGS_TOKEN] = token
+                            new_data[CONF_SMARTTHINGS_ACCESS_TOKEN] = access_token
+                            new_data[CONF_SMARTTHINGS_REFRESH_TOKEN] = (
+                                refresh_token if refresh_token else ""
+                            )
+                            new_data[CONF_SMARTTHINGS_TOKEN] = access_token
                             new_data[CONF_SMARTTHINGS_TOKEN_EXPIRES] = (
                                 time.time() + 86400
                             )
@@ -345,14 +360,23 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
         # Show form based on API method
         if api_method == "smartthings":
-            current_token = self.config_entry.data.get(
+            current_access_token = self.config_entry.data.get(
                 CONF_SMARTTHINGS_ACCESS_TOKEN, ""
             )
-            # Show masked token for security
-            masked_token = (
-                f"{'*' * (len(current_token) - 8)}{current_token[-8:]}"
-                if len(current_token) > 8
+            current_refresh_token = self.config_entry.data.get(
+                CONF_SMARTTHINGS_REFRESH_TOKEN, ""
+            )
+            
+            # Show masked tokens for security
+            masked_access = (
+                f"{'*' * (len(current_access_token) - 8)}{current_access_token[-8:]}"
+                if len(current_access_token) > 8
                 else "***"
+            )
+            masked_refresh = (
+                f"{'*' * (len(current_refresh_token) - 8)}{current_refresh_token[-8:]}"
+                if len(current_refresh_token) > 8
+                else "(not set)"
             )
 
             return self.async_show_form(
@@ -360,15 +384,23 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 data_schema=vol.Schema(
                     {
                         vol.Required(
-                            CONF_SMARTTHINGS_TOKEN,
-                            description={"suggested_value": masked_token},
+                            CONF_SMARTTHINGS_ACCESS_TOKEN,
+                            description={"suggested_value": masked_access},
+                        ): str,
+                        vol.Optional(
+                            CONF_SMARTTHINGS_REFRESH_TOKEN,
+                            description={"suggested_value": masked_refresh},
                         ): str,
                     }
                 ),
                 errors=errors,
                 description_placeholders={
-                    "current_method": "SmartThings API",
-                    "info": "WARNING: PAT tokens expire after 24 hours! Update with a new token every day.",
+                    "current_method": "SmartThings API with OAuth",
+                    "info": "Update your OAuth tokens:\n"
+                    "- Access Token: Your current token\n"
+                    "- Refresh Token: Required for automatic renewal!\n\n"
+                    f"Current Access Token: {masked_access}\n"
+                    f"Current Refresh Token: {masked_refresh}",
                 },
             )
         else:

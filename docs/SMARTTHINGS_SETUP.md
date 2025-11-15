@@ -1,104 +1,177 @@
 # SmartThings Setup Guide
 
-## Token Options
+## Token Setup
 
-### Option 1: OAuth Refresh Token (Recommended)
+### New Setup - OAuth 2.0 (Recommended)
 
-SmartThings now supports OAuth 2.0 with long-lived refresh tokens. This is the recommended approach.
+SmartThings now supports OAuth 2.0 with long-lived refresh tokens. This is the best option for automatic token renewal.
 
-1. Go to https://account.smartthings.com/oauth/authorize
-2. Generate an OAuth refresh token
-3. Use this token in Home Assistant - it will **never expire**
-4. The integration automatically refreshes the access token before it expires
+#### Step 1: Obtain OAuth Tokens
 
-**Benefits:**
-- Tokens never expire
-- Automatic refresh - fire and forget
-- Better security than PATs
-- Full OAuth 2.0 compliance
+Unfortunately, the SmartThings OAuth authorize endpoint is currently not publicly available. In the meantime, you can use **existing grandfathered PATs** that continue to work indefinitely.
 
-### Option 2: Personal Access Tokens (PAT)
+#### Step 2: Configure in Home Assistant
 
+During integration setup, you'll be asked for:
 
-**Important Update (December 2024):**
-- **Existing PATs**: Continue to work indefinitely (grandfathered in)
-- **New PATs**: Expire after 24 hours as of December 30, 2024
+1. **Access Token** (Required):
+   - Your current token for API authentication
+   - Expires after 24 hours
+   - Automatically renewed using refresh token
 
-If you have an existing PAT that still works, you can continue using it. However, SmartThings now recommends using OAuth refresh tokens for new setups.
+2. **Refresh Token** (Required for auto-renewal):
+   - Used to obtain new access tokens
+   - Does not expire
+   - Enables completely automatic token refresh
 
-**To create a Personal Access Token:**
+#### Step 3: Select Your TV
+
+The integration will discover all your SmartThings-connected TVs. Select the one you want to control.
+
+### Legacy Setup - Personal Access Token (PAT)
+
+If you have an existing PAT that still works:
 
 1. Go to https://account.smartthings.com/tokens
-2. Click "Generate new token"
-3. Name it: "Samsung Remote - Home Assistant"
-4. Select these scopes:
-   - `r:devices:*` - To list and get device info
-   - `x:devices:*` - To send commands
-5. Click "Generate"
-6. **Copy the token immediately** - It won't be shown again
-7. Keep it safe - treat it like a password
+2. Copy your existing PAT token
+3. During Home Assistant setup:
+   - Paste PAT as **Access Token**
+   - Leave **Refresh Token** empty
+   - The integration will treat it as a permanent token
 
-## How Token Refresh Works
+**Important**: New PATs created after December 30, 2024 expire after 24 hours. Only use old PATs or upgrade to OAuth tokens.
 
+## How Automatic Token Refresh Works
 
-The integration automatically handles token refresh:
+The integration handles everything automatically:
 
-1. Before each API call, it checks if the access token is about to expire
-2. If expiry is within 5 minutes, it automatically requests a new access token
-3. The refresh token is used to get a new access token
-4. This all happens transparently - you don't need to do anything
+1. **On startup**: Loads access token and refresh token from config
+2. **Before each API call**: Checks if token expires within 5 minutes
+3. **When renewal needed**: Uses refresh token to get a new access token
+4. **Transparently**: All happens in the background - you don't see it
+5. **Secure storage**: New tokens are stored in Home Assistant config
 
-**Result:** Your connection never drops due to token expiration.
+**Result**: Your tokens **never expire** and connection never drops!
+
+## Updating Tokens
+
+If you need to update your tokens later:
+
+1. Go to: Settings → Devices & Services
+2. Find your Samsung Remote integration
+3. Click the three dots → Modify
+4. Update **Access Token** and/or **Refresh Token**
+5. Click Submit
+
+You'll see masked tokens showing last 8 characters for security.
 
 ## Troubleshooting
 
-### Token shows "Unauthorized" after setup
-- Check if your internet connection is stable
-- Verify TV is still connected to SmartThings app
-- Try to send a command from the SmartThings mobile app first
-- If still failing, regenerate a new token at https://account.smartthings.com/tokens or https://account.smartthings.com/oauth/authorize
+### "Invalid Token" Error During Setup
 
-### TV doesn't appear in device list
-- Open SmartThings mobile app
-- Verify TV is listed there and online
-- Try disconnecting and reconnecting TV in SmartThings app
-- Restart Home Assistant to refresh device list
+This means the token couldn't authenticate with SmartThings API:
 
-### Commands not working
-- Verify TV is powered on
-- Try sending command from SmartThings app first (to verify TV connectivity)
-- Check TV brand/model supports remote control via SmartThings
-- View Home Assistant logs for detailed error messages
+1. **Verify token format**:
+   - Copy the entire token (no extra spaces)
+   - Make sure nothing was cut off
 
-### Token keeps showing as "Invalid" 
+2. **Check token is active**:
+   - Go to https://account.smartthings.com/tokens
+   - Verify your token is listed there
 
-With automatic token refresh enabled, tokens should not expire. If you see "Invalid Token" errors:
-- This indicates a connectivity or authentication issue, not token expiration
-- Check your home network internet connectivity
-- Verify SmartThings server status at https://status.smartthings.com/
-- Verify your refresh token is still valid in your SmartThings account
-- Regenerate a fresh token if errors persist
+3. **Verify scopes** (for PAT tokens):
+   - Token needs: `r:devices:*` and `x:devices:*`
+
+4. **Regenerate if needed**:
+   - Go to https://account.smartthings.com/tokens
+   - Delete the old token
+   - Create a new one
+
+### "No Samsung TVs found"
+
+Your token is valid, but SmartThings can't find any TVs:
+
+1. **Add TV to SmartThings account**:
+   - Open SmartThings mobile app
+   - Add your TV (if not already there)
+   - Verify TV is powered on and online
+
+2. **Verify in SmartThings app**:
+   - Open the SmartThings app
+   - You should see your TV in the devices list
+   - If not there, it can't be controlled
+
+3. **Refresh in Home Assistant**:
+   - Try rediscovering the integration
+   - Restart Home Assistant
+
+### Token Shows "Unauthorized" After Setup
+
+This shouldn't happen with refresh tokens, but if it does:
+
+1. **Check internet connection**:
+   - Verify your home network has internet
+   - SmartThings API requires internet connectivity
+
+2. **Verify TV connectivity**:
+   - Check TV is still in your SmartThings account
+   - Verify TV is powered on and online
+
+3. **Check logs**:
+   - Go to Settings → System → Logs
+   - Search for "SmartThings" or "samsung_remote"
+   - Look for specific error messages
+
+4. **Regenerate tokens if needed**:
+   - Go to https://account.smartthings.com/tokens
+   - Delete and recreate your token
+   - Update in Home Assistant settings
+
+### Commands Sent But TV Doesn't Respond
+
+1. **Verify via SmartThings app**:
+   - Try sending a command from SmartThings mobile app
+   - If that works, the TV is reachable
+
+2. **Check command compatibility**:
+   - Not all commands work with SmartThings API
+   - See supported commands in README
+
+3. **Try Local Tizen instead**:
+   - Local Tizen supports more commands
+   - Requires TV on same network
+   - No token expiration issues
+
+## OAuth Limitations
+
+The SmartThings OAuth authorize endpoint (`https://account.smartthings.com/oauth/authorize`) appears to be not publicly available. We're working on alternatives:
+
+1. **For now**: Use existing grandfathered PAT tokens (work indefinitely)
+2. **Future**: We'll provide an alternative OAuth flow when available
+3. **Fallback**: Use Local Tizen API (no tokens, LAN-based)
 
 ## Revoking Access
 
-To revoke Home Assistant's access:
-1. Go to https://account.smartthings.com/tokens (for PAT) or https://account.smartthings.com/oauth/authorize (for OAuth)
-2. Find "Samsung Remote - Home Assistant" token
-3. Click the delete icon
+To revoke Home Assistant's access to your SmartThings account:
+
+1. Go to: https://account.smartthings.com/tokens
+2. Find your token in the list
+3. Click the delete/revoke button
 4. Confirm deletion
 5. Home Assistant integration will stop working until new token added
 
-## Multiple Tokens
+## Multiple Integrations
 
 You can create multiple tokens for different purposes:
-- One for Home Assistant
-- One for backup/different installation
-- One for testing
+- One for main Home Assistant instance
+- One for testing setup
+- One for backup instance
 
 Each token is independent and can be revoked separately.
 
 ## More Information
 
-- SmartThings OAuth Documentation: https://developer.smartthings.com/docs/connected-services/oauth-integrations/
 - SmartThings API Documentation: https://developer.smartthings.com/docs/
-- Token Refresh Guide: See `docs/TOKEN_REFRESH_GUIDE.md` for detailed technical information
+- SmartThings Account: https://account.smartthings.com/
+- Token Refresh Guide: See `docs/TOKEN_REFRESH_GUIDE.md`
+- GitHub Issues: https://github.com/Qlimuli/samsung-tv-remote-HA/issues
