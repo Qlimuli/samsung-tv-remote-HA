@@ -62,6 +62,11 @@ class SmartThingsAPI:
             ) as resp:
                 if resp.status in (200, 201):
                     return await resp.json()
+                elif resp.status == 401:
+                    error_text = await resp.text()
+                    LOGGER.error(f"SmartThings Authentication failed (401): {error_text}")
+                    LOGGER.error("Check if: 1) Token is still valid, 2) Internet connection is stable, 3) SmartThings servers are up")
+                    raise Exception(f"SmartThings Authentication failed: {error_text}")
                 elif resp.status == 429 and retry_count < max_retries:
                     wait_time = 2 ** retry_count
                     LOGGER.warning(f"Rate limited, waiting {wait_time}s before retry")
