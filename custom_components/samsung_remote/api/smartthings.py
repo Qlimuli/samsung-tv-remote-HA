@@ -1,21 +1,41 @@
 """SmartThings API client for Samsung devices."""
 
 import asyncio
+import time
+from datetime import datetime, timedelta
 from typing import Any, Optional
 
 import aiohttp
 from homeassistant.core import HomeAssistant
 
-from ..const import DEFAULT_TIMEOUT, LOGGER, SAMSUNG_KEY_MAP, SMARTTHINGS_COMMANDS
+from ..const import (
+    DEFAULT_TIMEOUT,
+    LOGGER,
+    SAMSUNG_KEY_MAP,
+    SMARTTHINGS_COMMANDS,
+    SMARTTHINGS_OAUTH_TOKEN_URL,
+    CONF_SMARTTHINGS_ACCESS_TOKEN,
+    CONF_SMARTTHINGS_REFRESH_TOKEN,
+    CONF_SMARTTHINGS_TOKEN_EXPIRES,
+)
 
 
 class SmartThingsAPI:
-    """SmartThings API client."""
+    """SmartThings API client with OAuth 2.0 token refresh support."""
 
-    def __init__(self, hass: HomeAssistant, token: str, timeout: int = DEFAULT_TIMEOUT):
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        access_token: Optional[str] = None,
+        refresh_token: Optional[str] = None,
+        token_expires: Optional[float] = None,
+        timeout: int = DEFAULT_TIMEOUT,
+    ):
         """Initialize SmartThings client."""
         self.hass = hass
-        self.token = token
+        self.access_token = access_token
+        self.refresh_token = refresh_token
+        self.token_expires = token_expires
         self.timeout = timeout
         self.base_url = "https://api.smartthings.com/v1"
         self.session: Optional[aiohttp.ClientSession] = None
@@ -36,6 +56,74 @@ class SmartThingsAPI:
             await self.session.close()
             self.session = None
 
+    async def _refresh_token_if_needed(self) -> bool:
+        """Refresh OAuth token if it's about to expire."""
+        if not self.refresh_token:
+            LOGGER.error("No refresh token available for token refresh")
+            return False
+
+        # Check if token is expired or about to expire (within 5 minutes)
+        if self.token_expires:
+            time_until_expiry = self.token_expires - time.time()
+            if time_until_expiry > 300:  # 5 minutes buffer
+                return True
+
+        try:
+            LOGGER.debug("Refreshing SmartThings OAuth token...")
+            session = await self._get_session()
+
+            # Exchange refresh token for new access token
+            async with session.post(
+                SMARTTHINGS_OAUTH_TOKEN_URL,
+                data={
+                    "grant_type": "refresh_token",
+                    "refresh_token": self.refresh_token,
+                    "client_id": "homeassistant-samsung-remote",  # Home Assistant's public client
+                },
+                timeout=aiohttp.ClientTimeout(total=self.timeout),
+            ) as resp:
+                if resp.status == 200:
+                    response_data = await resp.json()
+                    self.access_token = response_data["access_token"]
+                    # Refresh token might be rotated
+                    if "refresh_token" in response_data:
+                        self.refresh_token = response_data["refresh_token"]
+                    # Update token expiry (expires_in is in seconds)
+                    expires_in = response_data.get("expires_in", 86400)
+                    self.token_expires = time.time() + expires_in
+
+                    LOGGER.debug("SmartThings OAuth token refreshed successfully")
+
+                    # Store updated tokens in config entry
+                    if self.hass.data.get("samsung_remote"):
+                        for entry in self.hass.config_entries.async_entries(
+                            "samsung_remote"
+                        ):
+                            new_data = {**entry.data}
+                            new_data[CONF_SMARTTHINGS_ACCESS_TOKEN] = (
+                                self.access_token
+                            )
+                            new_data[CONF_SMARTTHINGS_REFRESH_TOKEN] = (
+                                self.refresh_token
+                            )
+                            new_data[CONF_SMARTTHINGS_TOKEN_EXPIRES] = (
+                                self.token_expires
+                            )
+                            self.hass.config_entries.async_update_entry(
+                                entry, data=new_data
+                            )
+
+                    return True
+                else:
+                    error_text = await resp.text()
+                    LOGGER.error(
+                        f"Failed to refresh token: {resp.status} - {error_text}"
+                    )
+                    return False
+        except Exception as e:
+            LOGGER.error(f"Error refreshing token: {e}")
+            return False
+
     async def _request(
         self,
         method: str,
@@ -44,11 +132,15 @@ class SmartThingsAPI:
         retry_count: int = 0,
         max_retries: int = 3,
     ) -> dict[str, Any]:
-        """Make API request with retry logic."""
+        """Make API request with retry logic and automatic token refresh."""
+        if not await self._refresh_token_if_needed():
+            if self.refresh_token:  # Only fail if we have a refresh token but it failed
+                raise Exception("Failed to refresh OAuth token")
+
         session = await self._get_session()
         url = f"{self.base_url}{endpoint}"
         headers = {
-            "Authorization": f"Bearer {self.token}",
+            "Authorization": f"Bearer {self.access_token}",
             "Content-Type": "application/json",
         }
 
@@ -63,10 +155,21 @@ class SmartThingsAPI:
                 if resp.status in (200, 201):
                     return await resp.json()
                 elif resp.status == 401:
+                    # Token might be invalid, try to refresh and retry once
+                    if retry_count == 0 and self.refresh_token:
+                        LOGGER.warning("Got 401, attempting token refresh...")
+                        if await self._refresh_token_if_needed():
+                            return await self._request(
+                                method, endpoint, data, retry_count + 1, max_retries
+                            )
+
                     error_text = await resp.text()
-                    LOGGER.error(f"SmartThings Authentication failed (401): {error_text}")
-                    LOGGER.error("Check if: 1) Token is still valid, 2) Internet connection is stable, 3) SmartThings servers are up")
-                    raise Exception(f"SmartThings Authentication failed: {error_text}")
+                    LOGGER.error(
+                        f"SmartThings Authentication failed (401): {error_text}"
+                    )
+                    raise Exception(
+                        f"SmartThings Authentication failed: {error_text}"
+                    )
                 elif resp.status == 429 and retry_count < max_retries:
                     wait_time = 2 ** retry_count
                     LOGGER.warning(f"Rate limited, waiting {wait_time}s before retry")
@@ -76,7 +179,9 @@ class SmartThingsAPI:
                     )
                 else:
                     error_text = await resp.text()
-                    raise Exception(f"SmartThings API error {resp.status}: {error_text}")
+                    raise Exception(
+                        f"SmartThings API error {resp.status}: {error_text}"
+                    )
         except asyncio.TimeoutError:
             if retry_count < max_retries:
                 LOGGER.warning("Request timeout, retrying...")
@@ -168,7 +273,6 @@ class SmartThingsAPI:
         """
         async with self._command_lock:
             try:
-                import time
                 current_time = time.time()
                 time_since_last = current_time - self._last_command_time
                 min_delay = 0.3

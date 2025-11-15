@@ -6,7 +6,7 @@ Dieses Dokument enthält verschiedene Dashboard-Layouts für deine Samsung TV Fe
 
 Diese Variante zeigt die wichtigsten Funktionen in einem kompakten Layout.
 
-```yaml
+\`\`\`yaml
 type: vertical-stack
 cards:
   - type: custom:mushroom-template-card
@@ -351,7 +351,7 @@ card_mod:
       padding: 8px;
       box-shadow: 0 8px 32px rgba(0,0,0,0.4);
     }
-```
+\`\`\`
 
 ---
 

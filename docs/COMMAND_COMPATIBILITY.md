@@ -126,11 +126,11 @@ Du kannst in Home Assistant nachschauen:
 
 Wenn du SmartThings verwendest und einen nicht unterstützten Command sendest, erscheint:
 
-```
+\`\`\`
 WARNING: Command 'VOLUP' is not supported by SmartThings API. 
 This command only works with Tizen Local API.
 Supported SmartThings commands: BACK, DOWN, EXIT, FF, HOME, LEFT, MENU, MUTE, OK, PAUSE, PLAY, PLAY_BACK, REWIND, RIGHT, SOURCE, STOP, UP
-```
+\`\`\`
 
 **Lösung:** Wechsle zur Tizen Local API oder verwende nur die unterstützten Commands.
 

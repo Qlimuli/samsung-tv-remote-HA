@@ -11,9 +11,17 @@ CONF_DEVICE_ID = "device_id"
 CONF_DEVICE_NAME = "device_name"
 CONF_API_METHOD = "api_method"
 CONF_SMARTTHINGS_TOKEN = "smartthings_token"
+CONF_SMARTTHINGS_REFRESH_TOKEN = "smartthings_refresh_token"
+CONF_SMARTTHINGS_ACCESS_TOKEN = "smartthings_access_token"
+CONF_SMARTTHINGS_TOKEN_EXPIRES = "smartthings_token_expires"
 CONF_LOCAL_IP = "local_ip"
 CONF_LOCAL_PSK = "local_psk"
 CONF_TIMEOUT = "timeout"
+
+# OAuth Configuration
+SMARTTHINGS_OAUTH_AUTHORIZE_URL = "https://account.smartthings.com/oauth/authorize"
+SMARTTHINGS_OAUTH_TOKEN_URL = "https://auth-global.smartthings.com/oauth/token"
+SMARTTHINGS_OAUTH_SCOPES = ["r:devices:*", "x:devices:*"]
 
 # Defaults
 DEFAULT_TIMEOUT = 10
