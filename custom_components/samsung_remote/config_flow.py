@@ -284,7 +284,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
-        self.config_entry = config_entry
+        # Use self.hass instead, which is available in the flow
 
     async def async_step_init(
         self, user_input: Optional[dict[str, Any]] = None
