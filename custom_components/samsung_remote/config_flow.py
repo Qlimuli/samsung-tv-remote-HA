@@ -94,16 +94,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         ),
                         errors=errors,
                         description_placeholders={
-                            "token_info": "You can use either an OAuth refresh token or a Personal Access Token (PAT). "
-                            "Refresh tokens are recommended as they don't expire after 24 hours."
+                            "token_info": "IMPORTANT: SmartThings PAT tokens expire after 24 hours! "
+                            "Use an OAuth refresh token instead. "
+                            "See documentation for how to obtain a long-lived refresh token."
                         },
                     )
 
-                # Try to use as refresh token first (OAuth)
                 self.smartthings_api = SmartThingsAPI(
                     self.hass,
                     access_token=token_input,
-                    refresh_token=token_input,
+                    refresh_token=None,  # Start without refresh token
                     token_expires=None,
                 )
 
@@ -116,16 +116,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     if not self.devices:
                         errors["base"] = "no_devices_found"
                     else:
-                        # If validation succeeded, store tokens
+                        # If validation succeeded, store token
                         self.smartthings_access_token = token_input
-                        self.smartthings_refresh_token = token_input
-                        if self.smartthings_api.token_expires:
-                            self.smartthings_token_expires = (
-                                self.smartthings_api.token_expires
-                            )
-                        else:
-                            # For PAT tokens, set expiry to 24 hours from now
-                            self.smartthings_token_expires = time.time() + 86400
+                        self.smartthings_refresh_token = None  # No refresh token provided
+                        self.smartthings_token_expires = time.time() + 86400
 
                         # Clean up API before proceeding
                         await self.smartthings_api.close()
@@ -145,8 +139,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ),
             errors=errors,
             description_placeholders={
-                "token_help": "Get your token at https://account.smartthings.com/tokens. "
-                "Recommended: Use an OAuth refresh token for unlimited token lifetime."
+                "token_help": "IMPORTANT: PAT tokens from https://account.smartthings.com/tokens expire after 24 hours. "
+                "For a permanent solution, you need an OAuth refresh token. "
+                "See the documentation for instructions on setting up a long-lived token."
             },
         )
 
@@ -192,7 +187,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ),
             errors=errors,
             description_placeholders={
-                "ip_help": "Enter the IP address of your Samsung TV"
+                "ip_help": "Enter the IP address of your Samsung TV. No token expiration - tokens are permanent."
             },
         )
 
@@ -298,14 +293,14 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         api = SmartThingsAPI(
                             self.hass,
                             access_token=token,
-                            refresh_token=token,
+                            refresh_token=None,
                         )
                         if await api.validate_token():
                             await api.close()
                             # Update config entry with new token
                             new_data = {**self.config_entry.data}
                             new_data[CONF_SMARTTHINGS_ACCESS_TOKEN] = token
-                            new_data[CONF_SMARTTHINGS_REFRESH_TOKEN] = token
+                            new_data[CONF_SMARTTHINGS_REFRESH_TOKEN] = None
                             new_data[CONF_SMARTTHINGS_TOKEN] = token
                             new_data[CONF_SMARTTHINGS_TOKEN_EXPIRES] = (
                                 time.time() + 86400
@@ -373,7 +368,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 errors=errors,
                 description_placeholders={
                     "current_method": "SmartThings API",
-                    "info": "Update SmartThings token or refresh token",
+                    "info": "WARNING: PAT tokens expire after 24 hours! Update with a new token every day.",
                 },
             )
         else:
@@ -398,7 +393,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 errors=errors,
                 description_placeholders={
                     "current_method": "Local Tizen Connection",
-                    "info": "Update IP address or PSK",
+                    "info": "Update IP address or PSK. No token expiration - permanent connection.",
                 },
             )
 
