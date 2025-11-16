@@ -376,15 +376,24 @@ class SmartThingsAPI:
                 LOGGER.error("Access token is not set")
                 return False
             
+            token_length = len(self.access_token)
+            token_first_20 = self.access_token[:20]
+            token_last_10 = self.access_token[-10:]
+            LOGGER.debug(f"Token validation - Length: {token_length}, First 20: {token_first_20}..., Last 10: ...{token_last_10}")
+            
             # Just directly call API to check if token works    
             session = await self._get_session()
             url = f"{self.base_url}/devices"
             
+            auth_header = f"Bearer {self.access_token}"
+            LOGGER.debug(f"Using Authorization header: Bearer {self.access_token[:20]}... (length: {len(auth_header)})")
+            
             headers = {
-                "Authorization": f"Bearer {self.access_token}",
+                "Authorization": auth_header,
                 "Content-Type": "application/json",
             }
 
+            LOGGER.info(f"Starting token validation with SmartThings API...")
             async with session.get(
                 url,
                 headers=headers,
@@ -393,15 +402,16 @@ class SmartThingsAPI:
                 if resp.status == 200:
                     response_data = await resp.json()
                     is_valid = "items" in response_data
-                    LOGGER.info(f"Token validation: {'success' if is_valid else 'failed'}")
+                    LOGGER.info(f"Token validation: {'success' if is_valid else 'failed'} - Response contains 'items': {is_valid}")
                     return is_valid
                 elif resp.status == 401:
-                    LOGGER.error(f"Token validation failed: 401 Unauthorized - Token is invalid")
+                    error_text = await resp.text()
+                    LOGGER.error(f"Token validation failed: 401 Unauthorized - Token is invalid. Response: {error_text}")
                     return False
                 else:
                     error_text = await resp.text()
                     LOGGER.error(f"Token validation failed ({resp.status}): {error_text}")
                     return False
         except Exception as e:
-            LOGGER.error(f"Token validation failed: {e}")
+            LOGGER.error(f"Token validation failed: {e}", exc_info=True)
             return False

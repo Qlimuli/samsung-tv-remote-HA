@@ -92,7 +92,19 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     LOGGER.error("Access token is empty")
                     raise ValueError("Access token is required")
 
-                LOGGER.info(f"Validating SmartThings token: {access_token[:20]}...")
+                # Check token length and format
+                if len(access_token) < 10:
+                    errors["base"] = "invalid_token"
+                    LOGGER.error(f"Access token too short (length: {len(access_token)})")
+                    raise ValueError("Access token appears to be invalid (too short)")
+
+                # Check for common invalid characters
+                if any(char in access_token for char in ['\n', '\r', '\t', '  ']):
+                    errors["base"] = "invalid_token"
+                    LOGGER.error("Access token contains invalid whitespace characters")
+                    raise ValueError("Access token contains invalid whitespace")
+
+                LOGGER.info(f"Validating SmartThings token (length: {len(access_token)}, first 20: {access_token[:20]}...)")
                 
                 self.smartthings_api = SmartThingsAPI(
                     self.hass,
@@ -102,11 +114,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
 
                 # Validate tokens
+                LOGGER.info("Starting token validation...")
                 if not await self.smartthings_api.validate_token():
                     errors["base"] = "invalid_token"
                     LOGGER.error(f"Token validation failed for token: {access_token[:20]}...")
                 else:
                     # Fetch devices
+                    LOGGER.info("Token validation successful, fetching devices...")
                     self.devices = await self.smartthings_api.get_devices()
                     if not self.devices:
                         errors["base"] = "no_devices_found"
@@ -143,14 +157,18 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "token_help": "SmartThings OAuth Setup:\n"
                 "1. Access Token: Your current OAuth access token (expires in 24 hours)\n"
                 "2. Refresh Token: Your OAuth refresh token (used to automatically renew access token)\n\n"
-                "IMPORTANT: Both tokens are required for automatic token renewal!\n"
-                "Without a refresh token, you'll need to update the access token manually every 24 hours.\n\n"
-                "Common issues:\n"
-                "- Verify tokens are correct and not truncated\n"
-                "- Ensure there are no leading/trailing spaces\n"
-                "- Check that the TV is in your SmartThings account\n"
-                "- Make sure the tokens have not expired\n\n"
-                "See documentation for instructions on obtaining these tokens."
+                "IMPORTANT TROUBLESHOOTING:\n"
+                "- Verify tokens are EXACTLY correct (copy/paste from SmartThings)\n"
+                "- NO leading or trailing spaces\n"
+                "- NO newlines or tabs\n"
+                "- Check token length (usually 40+ characters)\n"
+                "- Ensure TV is in your SmartThings account\n"
+                "- Check token hasn't expired\n\n"
+                "If you still get 'invalid_token':\n"
+                "1. Check the Home Assistant logs for token details\n"
+                "2. Generate a new access token from SmartThings\n"
+                "3. Verify in SmartThings that your TV is properly connected\n\n"
+                "See documentation for detailed setup instructions."
             },
         )
 
