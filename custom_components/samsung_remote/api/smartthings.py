@@ -73,7 +73,6 @@ class SmartThingsAPI:
                 LOGGER.debug("No refresh token available - using legacy PAT token")
                 return True
 
-            # Check if token is NOT expired and has >5 minutes left
             if self.token_expires:
                 time_until_expiry = self.token_expires - time.time()
                 if time_until_expiry > 300:  # 5 minutes buffer
@@ -135,6 +134,13 @@ class SmartThingsAPI:
                         error_text = await resp.text()
                         LOGGER.error(f"Token refresh failed ({resp.status}): {error_text}")
                         return False
+            except asyncio.TimeoutError:
+                LOGGER.error("Token refresh timeout - SmartThings server may be unreachable")
+                return False
+            except aiohttp.ClientConnectorDNSError as e:
+                LOGGER.error(f"DNS error during token refresh (network issue): {e}")
+                LOGGER.warning("Cannot refresh token due to network/DNS issue. Will retry on next request.")
+                return True  # Return True to continue using current token
             except Exception as e:
                 LOGGER.error(f"Error refreshing token: {e}", exc_info=True)
                 return False
@@ -149,9 +155,12 @@ class SmartThingsAPI:
     ) -> dict[str, Any]:
         """Make API request with retry logic and automatic token refresh."""
         if retry_count == 0:
-            if not await self._refresh_token_if_needed():
-                if self.refresh_token:  # Only fail if we have a refresh token but it failed
-                    raise Exception("Failed to refresh OAuth token - refresh token may be invalid")
+            if self.refresh_token and self.token_expires:
+                time_until_expiry = self.token_expires - time.time()
+                if time_until_expiry < 300:  # Only refresh if less than 5 minutes left
+                    if not await self._refresh_token_if_needed():
+                        if self.refresh_token:
+                            raise Exception("Failed to refresh OAuth token - refresh token may be invalid")
 
         if not self.access_token:
             raise Exception("Access token is not set. Please reconfigure the integration.")
@@ -357,16 +366,42 @@ class SmartThingsAPI:
             return {}
 
     async def validate_token(self) -> bool:
-        """Validate SmartThings token."""
+        """Validate SmartThings token.
+        
+        Only validates API access, does NOT attempt token refresh.
+        This prevents DNS errors during validation.
+        """
         try:
             if not self.access_token:
                 LOGGER.error("Access token is not set")
                 return False
-                
-            response = await self._request("GET", "/devices")
-            is_valid = "items" in response
-            LOGGER.debug(f"Token validation: {'success' if is_valid else 'failed'}")
-            return is_valid
+            
+            # Just directly call API to check if token works    
+            session = await self._get_session()
+            url = f"{self.base_url}/devices"
+            
+            headers = {
+                "Authorization": f"Bearer {self.access_token}",
+                "Content-Type": "application/json",
+            }
+
+            async with session.get(
+                url,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=self.timeout),
+            ) as resp:
+                if resp.status == 200:
+                    response_data = await resp.json()
+                    is_valid = "items" in response_data
+                    LOGGER.info(f"Token validation: {'success' if is_valid else 'failed'}")
+                    return is_valid
+                elif resp.status == 401:
+                    LOGGER.error(f"Token validation failed: 401 Unauthorized - Token is invalid")
+                    return False
+                else:
+                    error_text = await resp.text()
+                    LOGGER.error(f"Token validation failed ({resp.status}): {error_text}")
+                    return False
         except Exception as e:
             LOGGER.error(f"Token validation failed: {e}")
             return False
