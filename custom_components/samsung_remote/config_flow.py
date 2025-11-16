@@ -89,50 +89,42 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 
                 if not access_token:
                     errors["base"] = "invalid_token"
-                    return self.async_show_form(
-                        step_id="smartthings",
-                        data_schema=vol.Schema(
-                            {
-                                vol.Required(CONF_SMARTTHINGS_ACCESS_TOKEN): str,
-                                vol.Optional(CONF_SMARTTHINGS_REFRESH_TOKEN): str,
-                            }
-                        ),
-                        errors=errors,
-                        description_placeholders={
-                            "token_info": "SmartThings OAuth Tokens:\n"
-                            "- Access Token: Required. Used to make API calls. Expires in 24 hours.\n"
-                            "- Refresh Token: REQUIRED for automatic renewal! Used to get a new access token without re-authentication.\n\n"
-                            "Both tokens are needed for permanent token renewal."
-                        },
-                    )
+                    LOGGER.error("Access token is empty")
+                    raise ValueError("Access token is required")
 
+                LOGGER.info(f"Validating SmartThings token: {access_token[:20]}...")
+                
                 self.smartthings_api = SmartThingsAPI(
                     self.hass,
                     access_token=access_token,
-                    refresh_token=refresh_token,
+                    refresh_token=refresh_token if refresh_token else None,
                     token_expires=time.time() + 86400,
                 )
 
                 # Validate tokens
                 if not await self.smartthings_api.validate_token():
                     errors["base"] = "invalid_token"
+                    LOGGER.error(f"Token validation failed for token: {access_token[:20]}...")
                 else:
                     # Fetch devices
                     self.devices = await self.smartthings_api.get_devices()
                     if not self.devices:
                         errors["base"] = "no_devices_found"
+                        LOGGER.warning("No devices found in SmartThings account")
                     else:
                         # If validation succeeded, store tokens
                         self.smartthings_access_token = access_token
-                        self.smartthings_refresh_token = refresh_token
+                        self.smartthings_refresh_token = refresh_token if refresh_token else None
                         self.smartthings_token_expires = time.time() + 86400
+                        
+                        LOGGER.info(f"SmartThings validation successful. Found {len(self.devices)} devices")
 
                         # Clean up API before proceeding
                         await self.smartthings_api.close()
                         return await self.async_step_select_device()
 
             except Exception as e:
-                LOGGER.error(f"SmartThings validation error: {e}")
+                LOGGER.error(f"SmartThings validation error: {e}", exc_info=True)
                 errors["base"] = "connection_error"
             finally:
                 if errors and self.smartthings_api:
@@ -153,6 +145,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "2. Refresh Token: Your OAuth refresh token (used to automatically renew access token)\n\n"
                 "IMPORTANT: Both tokens are required for automatic token renewal!\n"
                 "Without a refresh token, you'll need to update the access token manually every 24 hours.\n\n"
+                "Common issues:\n"
+                "- Verify tokens are correct and not truncated\n"
+                "- Ensure there are no leading/trailing spaces\n"
+                "- Check that the TV is in your SmartThings account\n"
+                "- Make sure the tokens have not expired\n\n"
                 "See documentation for instructions on obtaining these tokens."
             },
         )
@@ -284,7 +281,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
-        # Use self.hass instead, which is available in the flow
+        self.config_entry = config_entry
 
     async def async_step_init(
         self, user_input: Optional[dict[str, Any]] = None

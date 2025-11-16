@@ -153,8 +153,12 @@ class SmartThingsAPI:
                 if self.refresh_token:  # Only fail if we have a refresh token but it failed
                     raise Exception("Failed to refresh OAuth token - refresh token may be invalid")
 
+        if not self.access_token:
+            raise Exception("Access token is not set. Please reconfigure the integration.")
+
         session = await self._get_session()
         url = f"{self.base_url}{endpoint}"
+        
         headers = {
             "Authorization": f"Bearer {self.access_token}",
             "Content-Type": "application/json",
@@ -355,6 +359,10 @@ class SmartThingsAPI:
     async def validate_token(self) -> bool:
         """Validate SmartThings token."""
         try:
+            if not self.access_token:
+                LOGGER.error("Access token is not set")
+                return False
+                
             response = await self._request("GET", "/devices")
             is_valid = "items" in response
             LOGGER.debug(f"Token validation: {'success' if is_valid else 'failed'}")
