@@ -87,6 +87,20 @@ This means the token couldn't authenticate with SmartThings API:
    - Delete the old token
    - Create a new one
 
+### "403 Forbidden" Error When Sending Commands
+
+If setup works but buttons don't work (logs show "SmartThings API error 403"):
+
+1. **Missing Scopes**: 
+   - Your token has `r:devices:*` (can read status) but is missing `x:devices:*` (can execute commands).
+   - **Solution**: Generate a new token and ensure you check **ALL** of the following scopes:
+     - `r:devices:*` (Read all devices)
+     - `x:devices:*` (Execute all devices)
+     - `w:devices:*` (Write all devices - optional but recommended)
+
+2. **Device Permission**:
+   - Ensure the token was created for "All devices" or includes the specific TV you are trying to control.
+
 ### "No Samsung TVs found"
 
 Your token is valid, but SmartThings can't find any TVs:

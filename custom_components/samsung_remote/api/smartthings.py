@@ -187,6 +187,15 @@ class SmartThingsAPI:
                         f"Access token may be invalid or expired. "
                         f"Response: {error_text[:200]}"
                     )
+                elif resp.status == 403:
+                    error_text = await resp.text()
+                    LOGGER.error(f"SmartThings API 403 Forbidden: {error_text[:200]}")
+                    raise Exception(
+                        f"SmartThings API Permission Error (403 Forbidden). "
+                        f"Your token is valid but lacks permissions. "
+                        f"Make sure your token has 'r:devices:*' AND 'x:devices:*' scopes. "
+                        f"Response: {error_text[:200]}"
+                    )
                 elif resp.status == 429 and retry_count < max_retries:
                     wait_time = 2 ** retry_count
                     LOGGER.warning(f"Rate limited, waiting {wait_time}s before retry")
@@ -331,6 +340,13 @@ class SmartThingsAPI:
                 error_msg = str(e)
                 LOGGER.error(f"Failed to send command {command} (key: {key}): {error_msg}")
                 
+                if "403" in error_msg:
+                    LOGGER.error(
+                        f"Permission Denied! Your SmartThings token is missing the 'x:devices:*' (execute) scope. "
+                        f"Please generate a new token with ALL required scopes: r:devices:*, x:devices:* "
+                        f"See documentation: https://github.com/Qlimuli/samsung-tv-remote-HA/blob/main/docs/SMARTTHINGS_SETUP.md"
+                    )
+                
                 if "422" in error_msg or "ConstraintViolationError" in error_msg:
                     LOGGER.error(
                         f"API rejected command. This might mean:\n"
@@ -393,6 +409,10 @@ class SmartThingsAPI:
                 elif resp.status == 401:
                     error_text = await resp.text()
                     LOGGER.error(f"Token validation failed: 401 Unauthorized - Token is invalid or expired. Response: {error_text}")
+                    return False
+                elif resp.status == 403:
+                    error_text = await resp.text()
+                    LOGGER.error(f"Token validation failed: 403 Forbidden - Token lacks permissions. Response: {error_text}")
                     return False
                 else:
                     error_text = await resp.text()
