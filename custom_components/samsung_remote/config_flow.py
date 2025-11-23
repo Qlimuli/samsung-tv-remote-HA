@@ -171,6 +171,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "token_help": "SmartThings OAuth Setup:\n"
                 "1. Access Token: Your current OAuth access token (expires in 24 hours)\n"
                 "2. Refresh Token: Your OAuth refresh token (used to automatically renew access token)\n\n"
+                "IMPORTANT SCOPES REQUIRED:\n"
+                "- r:devices:* (Read access - for discovery)\n"
+                "- x:devices:* (Execute access - for remote control)\n"
+                "YOU MUST SELECT BOTH SCOPES WHEN CREATING THE TOKEN!\n\n"
                 "IMPORTANT TROUBLESHOOTING:\n"
                 "- Verify tokens are EXACTLY correct (copy/paste from SmartThings)\n"
                 "- NO leading or trailing spaces\n"
@@ -313,7 +317,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
-        self.config_entry = config_entry
+        pass
 
     async def async_step_init(
         self, user_input: Optional[dict[str, Any]] = None
