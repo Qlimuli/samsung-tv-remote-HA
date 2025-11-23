@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Any, Optional
 
 import aiohttp
+from aiohttp import ClientConnectorDNSError
 from homeassistant.core import HomeAssistant
 
 from ..const import (
@@ -33,8 +34,8 @@ class SmartThingsAPI:
     ):
         """Initialize SmartThings client."""
         self.hass = hass
-        self.access_token = access_token
-        self.refresh_token = refresh_token
+        self.access_token = access_token.strip() if access_token else None
+        self.refresh_token = refresh_token.strip() if refresh_token else None
         self.token_expires = token_expires
         self.timeout = timeout
         self.base_url = "https://api.smartthings.com/v1"
@@ -44,6 +45,12 @@ class SmartThingsAPI:
         self._command_lock = asyncio.Lock()
         self._last_command_time = 0.0
         self._token_refresh_lock = asyncio.Lock()
+        self._is_pat_token = not self.refresh_token  # PAT tokens have no refresh token
+
+        if self._is_pat_token:
+            LOGGER.debug("Initialized with PAT token (no refresh token provided)")
+        else:
+            LOGGER.debug("Initialized with OAuth token (refresh token provided)")
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session."""
@@ -60,19 +67,18 @@ class SmartThingsAPI:
     async def _refresh_token_if_needed(self) -> bool:
         """Refresh OAuth token if it's about to expire.
         
-        Only refreshes if:
-        1. We have a refresh token (not a legacy PAT)
-        2. Token is expired or expiring within 5 minutes
+        Only works with OAuth tokens (has refresh_token).
+        PAT tokens cannot be refreshed and will expire after 24 hours.
         
         Returns True if token is valid (either was fresh or refresh succeeded).
         Returns False only if refresh token exists but refresh failed.
         """
-        async with self._token_refresh_lock:
-            # No refresh token = legacy PAT token, cannot refresh
-            if not self.refresh_token:
-                LOGGER.debug("No refresh token available - using legacy PAT token")
-                return True
+        # PAT tokens cannot be refreshed
+        if self._is_pat_token:
+            LOGGER.debug("Using PAT token - no refresh possible")
+            return True
 
+        async with self._token_refresh_lock:
             if self.token_expires:
                 time_until_expiry = self.token_expires - time.time()
                 if time_until_expiry > 300:  # 5 minutes buffer
@@ -83,7 +89,6 @@ class SmartThingsAPI:
                 LOGGER.info("Refreshing SmartThings OAuth token...")
                 session = await self._get_session()
 
-                # SmartThings OAuth endpoint for public clients (no secret needed)
                 payload = {
                     "grant_type": "refresh_token",
                     "refresh_token": self.refresh_token,
@@ -100,17 +105,14 @@ class SmartThingsAPI:
                         self.access_token = response_data["access_token"]
                         new_token = self.access_token[:20]
                         
-                        # Refresh token might be rotated
                         if "refresh_token" in response_data:
                             self.refresh_token = response_data["refresh_token"]
                         
-                        # Update token expiry (expires_in is in seconds)
                         expires_in = response_data.get("expires_in", 86400)
                         self.token_expires = time.time() + expires_in
 
                         LOGGER.info(f"Token refreshed: {old_token}... -> {new_token}... (valid for {expires_in}s)")
 
-                        # Store updated tokens in config entry
                         for entry in self.hass.config_entries.async_entries("samsung_remote"):
                             if entry.entry_id and entry.data.get(CONF_SMARTTHINGS_ACCESS_TOKEN):
                                 new_data = {**entry.data}
@@ -121,28 +123,15 @@ class SmartThingsAPI:
                                 LOGGER.debug("Config entry updated with new tokens")
 
                         return True
-                    elif resp.status == 401:
-                        error_text = await resp.text()
-                        LOGGER.error(f"Token refresh failed - Unauthorized: {error_text}")
-                        LOGGER.error("Refresh token may be invalid or expired. Please re-configure the integration.")
-                        return False
-                    elif resp.status == 400:
-                        error_text = await resp.text()
-                        LOGGER.error(f"Token refresh failed - Bad Request: {error_text}")
-                        return False
                     else:
                         error_text = await resp.text()
                         LOGGER.error(f"Token refresh failed ({resp.status}): {error_text}")
                         return False
             except asyncio.TimeoutError:
-                LOGGER.error("Token refresh timeout - SmartThings server may be unreachable")
+                LOGGER.error("Token refresh timeout")
                 return False
-            except aiohttp.ClientConnectorDNSError as e:
-                LOGGER.error(f"DNS error during token refresh (network issue): {e}")
-                LOGGER.warning("Cannot refresh token due to network/DNS issue. Will retry on next request.")
-                return True  # Return True to continue using current token
             except Exception as e:
-                LOGGER.error(f"Error refreshing token: {e}", exc_info=True)
+                LOGGER.error(f"Error refreshing token: {e}")
                 return False
 
     async def _request(
@@ -154,13 +143,12 @@ class SmartThingsAPI:
         max_retries: int = 3,
     ) -> dict[str, Any]:
         """Make API request with retry logic and automatic token refresh."""
-        if retry_count == 0:
-            if self.refresh_token and self.token_expires:
+        if retry_count == 0 and not self._is_pat_token:
+            if self.token_expires:
                 time_until_expiry = self.token_expires - time.time()
-                if time_until_expiry < 300:  # Only refresh if less than 5 minutes left
+                if time_until_expiry < 300:
                     if not await self._refresh_token_if_needed():
-                        if self.refresh_token:
-                            raise Exception("Failed to refresh OAuth token - refresh token may be invalid")
+                        raise Exception("Failed to refresh OAuth token")
 
         if not self.access_token:
             raise Exception("Access token is not set. Please reconfigure the integration.")
@@ -169,7 +157,7 @@ class SmartThingsAPI:
         url = f"{self.base_url}{endpoint}"
         
         headers = {
-            "Authorization": f"Bearer {self.access_token}",
+            "Authorization": f"Bearer {self.access_token.strip()}",
             "Content-Type": "application/json",
         }
 
@@ -185,21 +173,19 @@ class SmartThingsAPI:
                     return await resp.json()
                 elif resp.status == 401:
                     error_text = await resp.text()
-                    LOGGER.warning(f"Got 401 Unauthorized: {error_text}")
+                    LOGGER.warning(f"401 Unauthorized from SmartThings API")
                     
-                    if retry_count == 0 and self.refresh_token:
+                    if retry_count == 0 and not self._is_pat_token and self.refresh_token:
                         LOGGER.info("Attempting token refresh after 401...")
                         if await self._refresh_token_if_needed():
-                            # Retry the request with new token
                             return await self._request(
                                 method, endpoint, data, retry_count + 1, max_retries
                             )
-                        else:
-                            LOGGER.error("Token refresh failed after 401")
                     
                     raise Exception(
-                        f"SmartThings Authentication failed (401): {error_text}. "
-                        f"Please check your access token and refresh token."
+                        f"SmartThings Authentication failed (401 Unauthorized). "
+                        f"Access token may be invalid or expired. "
+                        f"Response: {error_text[:200]}"
                     )
                 elif resp.status == 429 and retry_count < max_retries:
                     wait_time = 2 ** retry_count
@@ -211,7 +197,7 @@ class SmartThingsAPI:
                 else:
                     error_text = await resp.text()
                     raise Exception(
-                        f"SmartThings API error {resp.status}: {error_text}"
+                        f"SmartThings API error {resp.status}: {error_text[:200]}"
                     )
         except asyncio.TimeoutError:
             if retry_count < max_retries:
@@ -406,12 +392,21 @@ class SmartThingsAPI:
                     return is_valid
                 elif resp.status == 401:
                     error_text = await resp.text()
-                    LOGGER.error(f"Token validation failed: 401 Unauthorized - Token is invalid. Response: {error_text}")
+                    LOGGER.error(f"Token validation failed: 401 Unauthorized - Token is invalid or expired. Response: {error_text}")
                     return False
                 else:
                     error_text = await resp.text()
                     LOGGER.error(f"Token validation failed ({resp.status}): {error_text}")
                     return False
+
+        except ClientConnectorDNSError as e:
+            LOGGER.warning(f"Token validation could not complete due to network/DNS error: {e}. Assuming token is valid to allow startup.")
+            # We return TRUE here to allow setup to proceed during network outages
+            # The integration will retry connection later
+            return True
+        except asyncio.TimeoutError:
+            LOGGER.warning("Token validation timed out. Assuming network issue and allowing startup.")
+            return True
         except Exception as e:
-            LOGGER.error(f"Token validation failed: {e}", exc_info=True)
+            LOGGER.error(f"Token validation failed with unexpected error: {e}", exc_info=True)
             return False

@@ -59,6 +59,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
             # Validate token
             if not await api.validate_token():
+                # If we get here, it means 401 or explicit failure, NOT a network error
+                LOGGER.error("SmartThings token validation failed during startup. Integration will not be set up.")
                 raise ConfigEntryNotReady("Invalid SmartThings token")
         else:
             ip = entry.data.get(CONF_LOCAL_IP)
