@@ -19,8 +19,8 @@ CONF_LOCAL_PSK = "local_psk"
 CONF_TIMEOUT = "timeout"
 
 # OAuth Configuration
-SMARTTHINGS_OAUTH_AUTHORIZE_URL = "https://account.smartthings.com/oauth/authorize"
-SMARTTHINGS_OAUTH_TOKEN_URL = "https://auth-global.smartthings.com/oauth/token"
+SMARTTHINGS_OAUTH_AUTHORIZE_URL = "https://api.smartthings.com/oauth/authorize"
+SMARTTHINGS_OAUTH_TOKEN_URL = "https://api.smartthings.com/oauth/token"
 SMARTTHINGS_OAUTH_SCOPES = ["r:devices:*", "x:devices:*"]
 
 # Defaults
