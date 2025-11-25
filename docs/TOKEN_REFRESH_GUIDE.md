@@ -1,292 +1,223 @@
-# OAuth Token Refresh - Technical Guide
-
-## Overview
-
-This integration implements OAuth 2.0 token refresh to ensure your SmartThings connection never expires. With proper setup, you configure it once and tokens renew automatically forever.
-
-## The Problem
-
-SmartThings changed their token policy in December 2024:
-- **Old PAT tokens**: Continue working indefinitely (grandfathered in)
-- **New PAT tokens**: Expire after 24 hours
-- **Solution**: Use OAuth 2.0 refresh tokens for automatic renewal
-
-## How It Works
-
-### Token Architecture
-
-\`\`\`
-┌─────────────────────┐
-│ Initial Setup       │
-├─────────────────────┤
-│ Access Token (24h)  │
-│ Refresh Token (∞)   │
-└─────────────────────┘
-           │
-           ▼
-┌─────────────────────┐
-│ Stored Securely in  │
-│ Home Assistant      │
-└─────────────────────┘
-           │
-           ▼
-   Every API Call
-┌─────────────────────┐
-│ Check Token Expiry  │
-├─────────────────────┤
-│ >5 min? Use it      │
-│ <5 min? Refresh it  │
-└─────────────────────┘
-           │
-           ▼
-   ┌────────────────┐
-   │ New Access     │
-   │ Token (24h)    │
-   └────────────────┘
-\`\`\`
-
-### Refresh Mechanism
-
-1. **Configuration Phase**:
-   - User provides Access Token and Refresh Token
-   - Both stored securely in Home Assistant config
-   - Token expiry time recorded
-
-2. **Before Each Request**:
-   - Check how long until token expires
-   - If more than 5 minutes: use current token
-   - If less than 5 minutes: refresh immediately
-
-3. **Token Refresh Process**:
-   - Use Refresh Token to request new Access Token
-   - SmartThings API returns: `{access_token, expires_in, (refresh_token)}`
-   - Store new Access Token and expiry time
-   - Optionally update Refresh Token (if rotated)
-
-4. **Automatic Updates**:
-   - New tokens automatically saved to config
-   - Survives Home Assistant restarts
-   - Works even if TV is offline (token just renews)
-
-## Configuration
-
-### During Setup
-
-When you first configure the integration:
-
-1. **Access Token** (Required):
-   \`\`\`
-   Enter your SmartThings OAuth access token
-   (used for API authentication)
-   \`\`\`
-
-2. **Refresh Token** (Required):
-   \`\`\`
-   Enter your SmartThings OAuth refresh token
-   (used for automatic renewal)
-   \`\`\`
-
-Both are required for automatic refresh to work.
-
-### Updating Tokens
-
-If you need to update tokens later:
-
-1. Go to: **Settings → Devices & Services**
-2. Find your Samsung Remote integration
-3. Click **Options** (gear icon)
-4. Update **Access Token** and/or **Refresh Token**
-5. Click **Submit**
-
-Tokens are masked for security (showing only last 8 characters).
+# SmartThings OAuth 2.0 Setup Guide
 
-## Technical Implementation
+## 🎯 Warum OAuth 2.0?
 
-### Refresh Function
+- ✅ **Tokens laufen NIE ab** - Automatische Erneuerung
+- ✅ **Keine manuelle Wartung** - Komplett automatisch
+- ✅ **Sicher** - Industry-Standard OAuth 2.0
+- ✅ **Stabil** - Keine täglichen Token-Updates mehr
 
-The integration uses the OAuth 2.0 Refresh Token Grant:
+---
 
-\`\`\`python
-POST https://auth-global.smartthings.com/oauth/token
+## 📋 Voraussetzungen
 
-Parameters:
-  grant_type: "refresh_token"
-  refresh_token: "<your_refresh_token>"
-  client_id: "homeassistant-samsung-remote"
+- Home Assistant mit externer URL (für OAuth Callback)
+- SmartThings Developer Account
+- Samsung TV in SmartThings App verbunden
 
-Response:
-{
-  "access_token": "new_token_here",
-  "expires_in": 86400,  # 24 hours in seconds
-  "token_type": "Bearer",
-  "refresh_token": "new_or_same_refresh_token"
-}
-\`\`\`
+---
 
-### Refresh Timing
+## 🚀 Schritt 1: SmartThings Developer Account
 
-- **Check interval**: Before every API call
-- **Renewal threshold**: 5 minutes before expiry
-- **Frequency**: Usually once per day if actively used
-- **Overhead**: Minimal (just a timestamp check)
+1. Gehe zu: https://smartthings.developer.samsung.com/
+2. Melde dich mit deinem Samsung Account an
+3. Akzeptiere die Developer Terms of Service
 
-### Storage
+---
 
-Tokens stored in Home Assistant config entry:
+## 🛠️ Schritt 2: Projekt erstellen
 
-\`\`\`python
-{
-  "device_id": "device-123",
-  "api_method": "smartthings",
-  "smartthings_access_token": "access_token_here",
-  "smartthings_refresh_token": "refresh_token_here",
-  "smartthings_token_expires": 1734567890  # Unix timestamp
-}
-\`\`\`
+1. Gehe zu: https://smartthings.developer.samsung.com/workspace/projects
+2. Klicke auf **"New Project"**
+3. **Project Name**: `Home Assistant Integration`
+4. **Project Type**: Wähle **"Automation"**
+5. Klicke **"Create Project"**
 
-Encrypted by Home Assistant's storage system.
+---
 
-## Troubleshooting
+## 🔌 Schritt 3: App registrieren
 
-### Refresh Failing: "No refresh token available"
+1. Im Projekt, klicke auf **"Register App"**
+2. **App Type**: Wähle **"Webhook Endpoint"**
+3. **App Name**: `Home Assistant Samsung Remote`
+4. **Description**: `OAuth integration for Samsung TV control`
+5. **Target URL**: 
+   ```
+   https://your-home-assistant-url.com/api/webhook/smartthings
+   ```
+   ⚠️ Ersetze `your-home-assistant-url.com` mit deiner echten URL!
 
-**Cause**: Setup without refresh token
-**Solution**: Update integration to add refresh token:
-1. Settings → Devices & Services → Samsung Remote → Options
-2. Add your **Refresh Token**
-3. Click Submit
+6. **Scopes** - Wähle BEIDE:
+   - ☑️ `r:devices:*` (Read all devices)
+   - ☑️ `x:devices:*` (Execute all devices)
 
-### Logs Show: "Failed to refresh token: 401"
+7. Klicke **"Register App"**
 
-**Cause**: Refresh token is invalid or revoked
-**Solution**:
-1. Check refresh token at: https://account.smartthings.com/tokens
-2. If revoked, generate a new token
-3. Update in Home Assistant settings
+---
 
-### "Token validated successfully but refresh failed"
+## 🔑 Schritt 4: OAuth Client erstellen
 
-**Cause**: Access token valid, but refresh token issue
-**Solution**:
-1. Verify refresh token still exists in SmartThings account
-2. Try refreshing in SmartThings account settings
-3. Generate fresh tokens if needed
+1. Gehe zur **"OAuth Settings"** Tab
+2. Klicke **"Add OAuth Client"**
+3. **Redirect URI**:
+   ```
+   https://your-home-assistant-url.com/auth/external/callback
+   ```
+   ⚠️ Verwende deine echte Home Assistant externe URL!
 
-### Tokens Keep Failing After 24 Hours
+4. Klicke **"Generate OAuth Client"**
+5. **WICHTIG:** Kopiere sofort:
+   - ✅ **Client ID** (sichtbar)
+   - ✅ **Client Secret** (nur einmal sichtbar!)
 
-**Should NOT happen** - This indicates an error in the refresh flow:
+⚠️ **Client Secret wird nur EINMAL angezeigt!** Speichere es sicher!
 
-1. **Check logs**:
-   \`\`\`
-   Settings → System → Logs
-   Search: "samsung_remote" or "token"
-   \`\`\`
+---
 
-2. **Look for patterns**:
-   - "Failed to refresh token" = Refresh token issue
-   - "401 Unauthorized" = Both tokens invalid
-   - "Connection timeout" = Network issue
+## 🏠 Schritt 5: Home Assistant Integration
 
-3. **Manual refresh if needed**:
-   \`\`\`yaml
-   service: samsung_remote.refresh_oauth_token
-   data:
-     entry_id: "your_entry_id"
-   \`\`\`
+1. Gehe zu: **Einstellungen** → **Geräte & Dienste**
+2. Klicke **"+ Integration hinzufügen"**
+3. Suche nach **"Samsung Remote"**
+4. Wähle **"SmartThings API"**
+5. Wähle **"OAuth 2.0 (Empfohlen)"**
+6. Trage ein:
+   - **Client ID**: (aus Schritt 4)
+   - **Client Secret**: (aus Schritt 4)
+7. Du wirst zu SmartThings weitergeleitet
+8. **Authorisiere** die App
+9. Du wirst zurück zu Home Assistant geleitet
+10. Wähle deinen **Samsung TV** aus der Liste
+11. **Fertig!** 🎉
 
-### "Invalid token" but logs show successful refresh
+---
 
-**Cause**: Tokens refreshed but not saved to config
-**Solution**:
-1. Restart Home Assistant
-2. Check if tokens persisted
-3. If not, update integration with fresh tokens
+## ✅ Token Status überprüfen
 
-## Best Practices
+Nach dem Setup solltest du in den Logs sehen:
 
-### Token Security
+```
+✅ Token refreshed successfully
+Initialized with OAuth 2.0 (auto-refresh enabled)
+```
 
-1. **Never share tokens** - Treat like passwords
-2. **Store securely** - Home Assistant handles encryption
-3. **Revoke when done** - If moving to new setup
-4. **Rotate periodically** - Good security practice (once per month)
+---
 
-### Monitoring
+## 🔄 Wie funktioniert Auto-Refresh?
 
-Enable debug logging to monitor token refresh:
+1. **Access Token** läuft nach 24 Stunden ab
+2. **5 Minuten** vor Ablauf: Automatischer Refresh
+3. **Neuer Access Token** wird abgerufen
+4. **Refresh Token** wird aktualisiert (falls rotiert)
+5. **Tokens gespeichert** in Home Assistant Config
+6. **Komplett transparent** - Du merkst nichts!
 
-\`\`\`yaml
-# configuration.yaml
-logger:
-  logs:
-    custom_components.samsung_remote: debug
-\`\`\`
+---
 
-### Backup Strategy
+## 🆘 Troubleshooting
 
-1. **Store refresh token** somewhere safe
-2. **Note original access token** for comparison
-3. **If Home Assistant fails**: Can quickly restore with stored tokens
-4. **Document** the token setup date
+### "External URL required"
 
-## Rate Limits
+**Problem:** Home Assistant hat keine externe URL konfiguriert.
 
-SmartThings limits token refresh operations:
-- Per token: 100 refreshes per day
-- Per user: 1000 refreshes per day
-- Integration: Only refreshes when needed (efficient)
+**Lösung:**
+1. Gehe zu: **Einstellungen** → **System** → **Netzwerk**
+2. Setze **"External URL"**: 
+   ```
+   https://deine-domain.com:8123
+   ```
+   oder verwende DuckDNS, Nabu Casa, etc.
 
-You'll never hit these limits with normal usage.
+### "Redirect URI mismatch"
 
-## FAQ
+**Problem:** Die Redirect URI in SmartThings stimmt nicht überein.
 
-**Q: Do I need to manually refresh tokens?**
-A: No! The integration does it automatically.
+**Lösung:**
+1. Gehe zu SmartThings Developer Console
+2. Prüfe **OAuth Settings** → **Redirect URI**
+3. Stelle sicher, es ist EXAKT:
+   ```
+   https://your-exact-url.com/auth/external/callback
+   ```
 
-**Q: Will refresh tokens expire?**
-A: No! Refresh tokens are indefinite.
+### "Invalid client credentials"
 
-**Q: What if I have multiple Home Assistant instances?**
-A: Each can use same token. They'll refresh independently.
+**Problem:** Client ID oder Client Secret falsch eingegeben.
 
-**Q: Can I see when token was last refreshed?**
-A: Enable debug logs to see refresh messages.
+**Lösung:**
+1. Prüfe auf Leerzeichen am Anfang/Ende
+2. Client Secret wurde nur EINMAL angezeigt
+3. Falls verloren: Generiere neuen OAuth Client
 
-**Q: What happens if internet goes down?**
-A: Token refresh is skipped (only works online anyway).
+### "Token refresh failed"
 
-**Q: Can I use same token for multiple integrations?**
-A: Yes, but each instance refreshes independently.
+**Problem:** Refresh Token ist ungültig oder widerrufen.
 
-## Migration from PAT to OAuth
+**Lösung:**
+1. Lösche die Integration in Home Assistant
+2. Widerrufe die App in SmartThings:
+   - https://account.smartthings.com/tokens
+3. Erstelle neue OAuth Credentials
+4. Richte Integration neu ein
 
-If you have an old PAT that still works:
+---
 
-1. **Keep using it** - Grandfathered PATs work indefinitely
-2. **When regenerating**:
-   - Get new OAuth tokens instead
-   - Update in Home Assistant settings
-   - You're now using automatic refresh
+## 🔐 Sicherheit
 
-3. **No downtime** - Can switch tokens anytime
+### Client Secret schützen
 
-## Advanced: Manual Token Refresh
+- ❌ **Nie in Git committen**
+- ❌ **Nie öffentlich teilen**
+- ❌ **Nicht in Screenshots zeigen**
+- ✅ **Nur in Home Assistant Config**
+- ✅ **Backup verschlüsseln**
 
-For debugging or forced refresh:
+### OAuth Tokens widerrufen
 
-\`\`\`yaml
-service: samsung_remote.refresh_oauth_token
-data:
-  entry_id: "a1b2c3d4e5f6g7h8"
-\`\`\`
+Falls kompromittiert:
 
-Check logs to verify:
-\`\`\`
-SmartThings OAuth token refreshed successfully
-\`\`\`
+1. Gehe zu: https://account.smartthings.com/tokens
+2. Finde deine App
+3. Klicke **"Revoke"**
+4. Erstelle neue Credentials
+5. Richte Integration neu ein
 
-## Support
+---
 
-- **Issue**: https://github.com/Qlimuli/samsung-tv-remote-HA/issues
-- **Documentation**: docs/SMARTTHINGS_SETUP.md
-- **API Docs**: https://developer.smartthings.com/docs/
+## 📊 Vergleich: OAuth vs PAT
+
+| Feature | OAuth 2.0 | PAT (neu) | PAT (alt) |
+|---------|-----------|-----------|-----------|
+| Setup-Aufwand | Hoch | Niedrig | Niedrig |
+| Token-Erneuerung | ✅ Automatisch | ❌ Manuell (täglich) | ✅ Nie nötig |
+| Läuft ab nach | ♾️ Nie | 24 Stunden | ♾️ Nie |
+| Empfohlen | ✅ Ja | ❌ Nein | ✅ Ja (falls vorhanden) |
+
+---
+
+## 🎓 Weiterführende Links
+
+- SmartThings Developer Console: https://smartthings.developer.samsung.com/
+- SmartThings API Docs: https://developer.smartthings.com/docs/
+- Home Assistant External URL: https://www.home-assistant.io/integrations/http/#external_url
+- Integration Repository: https://github.com/Qlimuli/samsung-tv-remote-HA
+
+---
+
+## 💬 Support
+
+Probleme mit dem Setup?
+
+1. **Prüfe Logs**: Einstellungen → System → Logs
+2. **GitHub Issue**: https://github.com/Qlimuli/samsung-tv-remote-HA/issues
+3. **Home Assistant Community**: https://community.home-assistant.io/
+
+---
+
+## ✨ Fertig!
+
+Nach dem Setup:
+- Tokens erneuern sich automatisch
+- Keine Wartung mehr nötig
+- TV-Steuerung funktioniert immer
+- Entspannt zurücklehnen! 🎬🍿
