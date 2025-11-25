@@ -1,15 +1,18 @@
-"""Config flow for Samsung Remote integration."""
+"""Config flow for Samsung Remote integration with full OAuth 2.0."""
 
 import time
+import secrets
 from typing import Any, Optional
+from urllib.parse import urlencode
 
 import voluptuous as vol
 from aiohttp import ClientConnectorDNSError
 
 from homeassistant import config_entries
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import config_entry_oauth2_flow
 
 from .api.smartthings import SmartThingsAPI
 from .api.tizen_local import TizenLocalAPI
@@ -23,9 +26,12 @@ from .const import (
     CONF_SMARTTHINGS_REFRESH_TOKEN,
     CONF_SMARTTHINGS_TOKEN,
     CONF_SMARTTHINGS_TOKEN_EXPIRES,
+    CONF_SMARTTHINGS_CLIENT_ID,
+    CONF_SMARTTHINGS_CLIENT_SECRET,
     DEFAULT_API_METHOD,
     DOMAIN,
     LOGGER,
+    SMARTTHINGS_OAUTH_AUTHORIZE_URL,
 )
 
 
@@ -47,6 +53,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self.smartthings_access_token: Optional[str] = None
         self.smartthings_refresh_token: Optional[str] = None
         self.smartthings_token_expires: Optional[float] = None
+        self.smartthings_client_id: Optional[str] = None
+        self.smartthings_client_secret: Optional[str] = None
+        self.oauth_state: Optional[str] = None
 
     async def async_step_user(
         self, user_input: Optional[dict[str, Any]] = None
@@ -58,7 +67,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self.api_method = user_input[CONF_API_METHOD]
 
             if self.api_method == "smartthings":
-                return await self.async_step_smartthings()
+                return await self.async_step_smartthings_method()
             else:
                 return await self.async_step_tizen_local()
 
@@ -77,76 +86,237 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             },
         )
 
-    async def async_step_smartthings(
+    async def async_step_smartthings_method(
         self, user_input: Optional[dict[str, Any]] = None
     ) -> FlowResult:
-        """Handle SmartThings API setup."""
+        """Choose between OAuth or PAT."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            method = user_input["method"]
+            
+            if method == "oauth":
+                return await self.async_step_smartthings_oauth_setup()
+            else:
+                return await self.async_step_smartthings_pat()
+
+        return self.async_show_form(
+            step_id="smartthings_method",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("method"): vol.In({
+                        "oauth": "OAuth 2.0 (Recommended - Auto-refresh)",
+                        "pat": "Personal Access Token (Legacy - Manual refresh)"
+                    }),
+                }
+            ),
+            errors=errors,
+            description_placeholders={
+                "info": "**OAuth 2.0** (Recommended):\n"
+                "- Tokens refresh automatically\n"
+                "- Never expires\n"
+                "- Requires SmartThings App registration\n\n"
+                "**Personal Access Token** (PAT):\n"
+                "- Simple setup\n"
+                "- New PATs expire after 24 hours\n"
+                "- Old PATs (before Dec 2024) never expire\n"
+                "- Must be renewed manually"
+            },
+        )
+
+    async def async_step_smartthings_oauth_setup(
+        self, user_input: Optional[dict[str, Any]] = None
+    ) -> FlowResult:
+        """Setup OAuth credentials."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            self.smartthings_client_id = user_input["client_id"].strip()
+            self.smartthings_client_secret = user_input["client_secret"].strip()
+            
+            if not self.smartthings_client_id or not self.smartthings_client_secret:
+                errors["base"] = "missing_credentials"
+            else:
+                # Generate OAuth state for security
+                self.oauth_state = secrets.token_urlsafe(32)
+                
+                # Build authorization URL
+                redirect_uri = f"{self.hass.config.external_url}/auth/external/callback"
+                
+                auth_params = {
+                    "client_id": self.smartthings_client_id,
+                    "redirect_uri": redirect_uri,
+                    "response_type": "code",
+                    "scope": "r:devices:* x:devices:*",
+                    "state": self.oauth_state,
+                }
+                
+                auth_url = f"{SMARTTHINGS_OAUTH_AUTHORIZE_URL}?{urlencode(auth_params)}"
+                
+                LOGGER.info(f"OAuth Authorization URL: {auth_url}")
+                
+                return self.async_external_step(
+                    step_id="smartthings_oauth_callback",
+                    url=auth_url
+                )
+
+        return self.async_show_form(
+            step_id="smartthings_oauth_setup",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("client_id"): str,
+                    vol.Required("client_secret"): str,
+                }
+            ),
+            errors=errors,
+            description_placeholders={
+                "setup_instructions": 
+                "# SmartThings OAuth Setup\n\n"
+                "## Step 1: Register a SmartThings App\n\n"
+                "1. Go to: https://smartthings.developer.samsung.com/workspace/projects\n"
+                "2. Click **'New Project'**\n"
+                "3. Project Name: `Home Assistant Integration`\n"
+                "4. Click **'Register App'**\n"
+                "5. Select **'Webhook Endpoint'**\n"
+                "6. App Name: `Home Assistant`\n"
+                "7. Target URL: `https://your-home-assistant-url/api/webhook/smartthings`\n"
+                "8. Scopes: Select ALL of these:\n"
+                "   - ☑ `r:devices:*`\n"
+                "   - ☑ `x:devices:*`\n"
+                "9. Click **'Save'**\n\n"
+                "## Step 2: Get OAuth Credentials\n\n"
+                "1. Click on your newly created app\n"
+                "2. Go to **'OAuth Settings'** tab\n"
+                "3. Add Redirect URI: `" + (self.hass.config.external_url or "http://homeassistant.local:8123") + "/auth/external/callback`\n"
+                "4. Click **'Generate OAuth Client'**\n"
+                "5. Copy the **Client ID** and **Client Secret**\n"
+                "6. Paste them below\n\n"
+                "⚠️ **Important**: Keep Client Secret safe and never share it!\n\n"
+                "📖 Full guide: https://github.com/Qlimuli/samsung-tv-remote-HA/blob/main/docs/OAUTH_SETUP.md"
+            },
+        )
+
+    async def async_step_smartthings_oauth_callback(
+        self, user_input: Optional[dict[str, Any]] = None
+    ) -> FlowResult:
+        """Handle OAuth callback."""
+        errors: dict[str, str] = {}
+        
+        if user_input is not None:
+            code = user_input.get("code")
+            state = user_input.get("state")
+            
+            # Verify state to prevent CSRF
+            if state != self.oauth_state:
+                errors["base"] = "invalid_state"
+                LOGGER.error("OAuth state mismatch - possible CSRF attack")
+                return self.async_abort(reason="invalid_state")
+            
+            if not code:
+                errors["base"] = "no_code"
+                LOGGER.error("No authorization code received from SmartThings")
+                return self.async_abort(reason="no_code")
+            
+            try:
+                # Exchange authorization code for tokens
+                api = SmartThingsAPI(
+                    self.hass,
+                    client_id=self.smartthings_client_id,
+                    client_secret=self.smartthings_client_secret,
+                )
+                
+                redirect_uri = f"{self.hass.config.external_url}/auth/external/callback"
+                
+                tokens = await api.exchange_code_for_tokens(code, redirect_uri)
+                
+                self.smartthings_access_token = tokens["access_token"]
+                self.smartthings_refresh_token = tokens["refresh_token"]
+                self.smartthings_token_expires = time.time() + tokens.get("expires_in", 86400)
+                
+                LOGGER.info("Successfully obtained OAuth tokens from SmartThings")
+                
+                # Now fetch devices
+                self.smartthings_api = SmartThingsAPI(
+                    self.hass,
+                    access_token=self.smartthings_access_token,
+                    refresh_token=self.smartthings_refresh_token,
+                    token_expires=self.smartthings_token_expires,
+                    client_id=self.smartthings_client_id,
+                    client_secret=self.smartthings_client_secret,
+                )
+                
+                self.devices = await self.smartthings_api.get_devices()
+                
+                if not self.devices:
+                    return self.async_abort(reason="no_devices_found")
+                
+                await self.smartthings_api.close()
+                return await self.async_step_select_device()
+                
+            except Exception as e:
+                LOGGER.error(f"OAuth token exchange failed: {e}", exc_info=True)
+                errors["base"] = "token_exchange_failed"
+                return self.async_abort(reason="token_exchange_failed")
+
+        return self.async_show_form(
+            step_id="smartthings_oauth_callback",
+            data_schema=vol.Schema({}),
+            errors=errors,
+        )
+
+    async def async_step_smartthings_pat(
+        self, user_input: Optional[dict[str, Any]] = None
+    ) -> FlowResult:
+        """Handle SmartThings PAT setup."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
             try:
                 access_token = user_input[CONF_SMARTTHINGS_ACCESS_TOKEN].strip()
-                refresh_token_input = user_input.get(CONF_SMARTTHINGS_REFRESH_TOKEN, "")
-                refresh_token = refresh_token_input.strip() if refresh_token_input else None
                 
                 if not access_token:
                     errors["base"] = "invalid_token"
                     LOGGER.error("Access token is empty")
                     raise ValueError("Access token is required")
 
-                # Check token length and format
                 if len(access_token) < 10:
                     errors["base"] = "invalid_token"
                     LOGGER.error(f"Access token too short (length: {len(access_token)})")
                     raise ValueError("Access token appears to be invalid (too short)")
 
-                # Check for common invalid characters
-                if any(char in access_token for char in ['\n', '\r', '\t', '  ']):
-                    errors["base"] = "invalid_token"
-                    LOGGER.error("Access token contains invalid whitespace characters")
-                    raise ValueError("Access token contains invalid whitespace")
-
-                LOGGER.info(f"Validating SmartThings token (length: {len(access_token)}, first 20: {access_token[:20]}...)")
+                LOGGER.info(f"Validating SmartThings PAT token (length: {len(access_token)})")
                 
                 self.smartthings_api = SmartThingsAPI(
                     self.hass,
                     access_token=access_token,
-                    refresh_token=refresh_token,
-                    token_expires=time.time() + 86400,
+                    refresh_token=None,  # PAT has no refresh token
+                    token_expires=None,
                 )
 
-                # Validate tokens
                 LOGGER.info("Starting token validation...")
                 if not await self.smartthings_api.validate_token():
                     errors["base"] = "invalid_token" 
-                    LOGGER.error(f"Token validation failed for token: {access_token[:20]}...")
+                    LOGGER.error(f"Token validation failed for PAT token")
                 else:
-                    # Fetch devices
                     LOGGER.info("Token validation successful, fetching devices...")
                     try:
                         self.devices = await self.smartthings_api.get_devices()
                     except Exception as e:
-                        LOGGER.warning(f"Could not fetch devices during setup (possible network issue): {e}")
+                        LOGGER.warning(f"Could not fetch devices: {e}")
                         self.devices = []
 
                     if not self.devices:
-                        # But for initial setup, let's just warn.
-                        # If network error happened during get_devices but validation passed (via my new True return),
-                        # we should probably let them select "Manually enter Device ID" or retry.
-                        # For now, let's assume if get_devices fails, we can't proceed easily without manual ID.
-                        # Let's just fallback to a generic empty list and handle it.
-                        pass
+                        errors["base"] = "no_devices_found"
+                        LOGGER.error("No devices found in SmartThings account")
+                    else:
+                        self.smartthings_access_token = access_token
+                        self.smartthings_refresh_token = None
+                        self.smartthings_token_expires = None
+                            
+                        LOGGER.info(f"SmartThings PAT setup successful. Found {len(self.devices)} devices")
 
-                    # If validation succeeded (or was bypassed due to network), store tokens
-                    self.smartthings_access_token = access_token
-                    self.smartthings_refresh_token = refresh_token
-                    self.smartthings_token_expires = time.time() + 86400
-                        
-                    LOGGER.info(f"SmartThings setup successful. Found {len(self.devices)} devices")
-
-                    # Clean up API before proceeding
-                    await self.smartthings_api.close()
-                    return await self.async_step_select_device()
+                        await self.smartthings_api.close()
+                        return await self.async_step_select_device()
 
             except ClientConnectorDNSError:
                 LOGGER.error("DNS/Network error during SmartThings setup")
@@ -159,34 +329,32 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     await self.smartthings_api.close()
 
         return self.async_show_form(
-            step_id="smartthings",
+            step_id="smartthings_pat",
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_SMARTTHINGS_ACCESS_TOKEN): str,
-                    vol.Optional(CONF_SMARTTHINGS_REFRESH_TOKEN): str,
                 }
             ),
             errors=errors,
             description_placeholders={
-                "token_help": "SmartThings OAuth Setup:\n"
-                "1. Access Token: Your current OAuth access token (expires in 24 hours)\n"
-                "2. Refresh Token: Your OAuth refresh token (used to automatically renew access token)\n\n"
-                "IMPORTANT SCOPES REQUIRED:\n"
-                "- r:devices:* (Read access - for discovery)\n"
-                "- x:devices:* (Execute access - for remote control)\n"
-                "YOU MUST SELECT BOTH SCOPES WHEN CREATING THE TOKEN!\n\n"
-                "IMPORTANT TROUBLESHOOTING:\n"
-                "- Verify tokens are EXACTLY correct (copy/paste from SmartThings)\n"
-                "- NO leading or trailing spaces\n"
-                "- NO newlines or tabs\n"
-                "- Check token length (usually 40+ characters)\n"
-                "- Ensure TV is in your SmartThings account\n"
-                "- Check token hasn't expired\n\n"
-                "If you still get 'invalid_token':\n"
-                "1. Check the Home Assistant logs for token details\n"
-                "2. Generate a new access token from SmartThings\n"
-                "3. Verify in SmartThings that your TV is properly connected\n\n"
-                "See documentation for detailed setup instructions."
+                "token_help": "# Personal Access Token (PAT) Setup\n\n"
+                "## Option 1: Old PAT (Created before Dec 2024)\n"
+                "✅ **Never expires** - Use this if you have one!\n\n"
+                "## Option 2: New PAT (Created after Dec 2024)\n"
+                "⚠️ **Expires after 24 hours** - Must be renewed manually\n\n"
+                "## How to get a PAT:\n\n"
+                "1. Go to: https://account.smartthings.com/tokens\n"
+                "2. Click **'Generate new token'**\n"
+                "3. Select these scopes:\n"
+                "   - ☑ `r:devices:*` (Read devices)\n"
+                "   - ☑ `x:devices:*` (Execute devices)\n"
+                "4. Click **'Generate token'**\n"
+                "5. Copy the token and paste below\n\n"
+                "⚠️ **Token Expiration**:\n"
+                "- Old PATs: Never expire\n"
+                "- New PATs: Expire after 24 hours\n"
+                "- **Recommendation**: Use OAuth 2.0 instead for auto-refresh!\n\n"
+                "📖 Full guide: https://github.com/Qlimuli/samsung-tv-remote-HA/blob/main/docs/SMARTTHINGS_SETUP.md"
             },
         )
 
@@ -232,7 +400,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ),
             errors=errors,
             description_placeholders={
-                "ip_help": "Enter the IP address of your Samsung TV. No token expiration - tokens are permanent."
+                "ip_help": "# Local Tizen Setup\n\n"
+                "✅ No token expiration\n"
+                "✅ All commands supported\n"
+                "✅ Faster response time\n\n"
+                "Enter the IP address of your Samsung TV.\n\n"
+                "**How to find your TV's IP:**\n"
+                "1. TV Settings → Network → Network Status\n"
+                "2. Or check your router's DHCP list\n\n"
+                "**Pre-Shared Key (Optional)**:\n"
+                "Only needed if you've enabled it on your TV"
             },
         )
 
@@ -254,6 +431,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     smartthings_access_token=self.smartthings_access_token,
                     smartthings_refresh_token=self.smartthings_refresh_token,
                     smartthings_token_expires=self.smartthings_token_expires,
+                    smartthings_client_id=self.smartthings_client_id,
+                    smartthings_client_secret=self.smartthings_client_secret,
                 )
 
         if not self.devices:
@@ -298,6 +477,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             entry_data[CONF_SMARTTHINGS_TOKEN_EXPIRES] = kwargs.get(
                 CONF_SMARTTHINGS_TOKEN_EXPIRES
             )
+            entry_data[CONF_SMARTTHINGS_CLIENT_ID] = kwargs.get(
+                CONF_SMARTTHINGS_CLIENT_ID
+            )
+            entry_data[CONF_SMARTTHINGS_CLIENT_SECRET] = kwargs.get(
+                CONF_SMARTTHINGS_CLIENT_SECRET
+            )
             # Keep old token format for backward compatibility
             entry_data[CONF_SMARTTHINGS_TOKEN] = kwargs.get(
                 CONF_SMARTTHINGS_ACCESS_TOKEN
@@ -317,7 +502,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
-        pass
+        self.config_entry = config_entry
 
     async def async_step_init(
         self, user_input: Optional[dict[str, Any]] = None
@@ -328,31 +513,22 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         api_method = self.config_entry.data.get(CONF_API_METHOD, "smartthings")
 
         if user_input is not None:
-            # Update based on API method
             if api_method == "smartthings":
                 access_token = user_input.get(CONF_SMARTTHINGS_ACCESS_TOKEN, "").strip()
-                refresh_token = user_input.get(CONF_SMARTTHINGS_REFRESH_TOKEN, "").strip()
 
                 if access_token:
-                    # Validate new tokens
                     try:
                         api = SmartThingsAPI(
                             self.hass,
                             access_token=access_token,
-                            refresh_token=refresh_token if refresh_token else None,
+                            refresh_token=None,
                         )
                         if await api.validate_token():
                             await api.close()
-                            # Update config entry with new tokens
                             new_data = {**self.config_entry.data}
                             new_data[CONF_SMARTTHINGS_ACCESS_TOKEN] = access_token
-                            new_data[CONF_SMARTTHINGS_REFRESH_TOKEN] = (
-                                refresh_token if refresh_token else ""
-                            )
                             new_data[CONF_SMARTTHINGS_TOKEN] = access_token
-                            new_data[CONF_SMARTTHINGS_TOKEN_EXPIRES] = (
-                                time.time() + 86400
-                            )
+                            # Don't update refresh token or client credentials
                             self.hass.config_entries.async_update_entry(
                                 self.config_entry,
                                 data=new_data,
@@ -374,7 +550,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         api = TizenLocalAPI(ip, psk)
                         if await api.validate_connection():
                             await api.close()
-                            # Update config entry
                             self.hass.config_entries.async_update_entry(
                                 self.config_entry,
                                 data={
@@ -396,20 +571,11 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             current_access_token = self.config_entry.data.get(
                 CONF_SMARTTHINGS_ACCESS_TOKEN, ""
             )
-            current_refresh_token = self.config_entry.data.get(
-                CONF_SMARTTHINGS_REFRESH_TOKEN, ""
-            )
             
-            # Show masked tokens for security
             masked_access = (
                 f"{'*' * (len(current_access_token) - 8)}{current_access_token[-8:]}"
                 if len(current_access_token) > 8
                 else "***"
-            )
-            masked_refresh = (
-                f"{'*' * (len(current_refresh_token) - 8)}{current_refresh_token[-8:]}"
-                if len(current_refresh_token) > 8
-                else "(not set)"
             )
 
             return self.async_show_form(
@@ -420,24 +586,20 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                             CONF_SMARTTHINGS_ACCESS_TOKEN,
                             description={"suggested_value": masked_access},
                         ): str,
-                        vol.Optional(
-                            CONF_SMARTTHINGS_REFRESH_TOKEN,
-                            description={"suggested_value": masked_refresh},
-                        ): str,
                     }
                 ),
                 errors=errors,
                 description_placeholders={
-                    "current_method": "SmartThings API with OAuth",
-                    "info": "Update your OAuth tokens:\n"
-                    "- Access Token: Your current token\n"
-                    "- Refresh Token: Required for automatic renewal!\n\n"
-                    f"Current Access Token: {masked_access}\n"
-                    f"Current Refresh Token: {masked_refresh}",
+                    "current_method": "SmartThings API",
+                    "info": f"Current Access Token: {masked_access}\n\n"
+                    "⚠️ **Important**:\n"
+                    "- OAuth tokens refresh automatically - no need to update\n"
+                    "- PAT tokens expire after 24 hours (if created after Dec 2024)\n"
+                    "- Only update if you want to switch to a different token\n\n"
+                    "💡 **Tip**: If using PAT and it expires daily, consider setting up OAuth 2.0 instead!",
                 },
             )
         else:
-            # Tizen local options
             current_ip = self.config_entry.data.get(CONF_LOCAL_IP, "")
             current_psk = self.config_entry.data.get(CONF_LOCAL_PSK, "")
 
