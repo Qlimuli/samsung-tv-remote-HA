@@ -2,41 +2,69 @@
   "config": {
     "step": {
       "user": {
-        "title": "Samsung Fernbedienung Setup",
-        "description": "Wählen Sie Ihre Verbindungsmethode zur Samsung TV",
+        "title": "Samsung Remote Setup",
+        "description": "Wähle deine Verbindungsmethode",
         "data": {
           "api_method": "Verbindungsmethode"
         }
       },
-      "smartthings": {
-        "title": "SmartThings API Setup",
-        "description": "Geben Sie Ihr persönliches SmartThings-Zugriffstoken ein",
+      "smartthings_method": {
+        "title": "SmartThings Authentifizierung",
+        "description": "Wähle deine Authentifizierungsmethode",
         "data": {
-          "smartthings_token": "SmartThings Token"
+          "method": "Methode"
+        }
+      },
+      "smartthings_oauth_setup": {
+        "title": "SmartThings OAuth Setup",
+        "description": "Gib deine OAuth Credentials ein",
+        "data": {
+          "client_id": "Client ID",
+          "client_secret": "Client Secret"
+        }
+      },
+      "smartthings_pat": {
+        "title": "SmartThings Personal Access Token",
+        "description": "Gib deinen SmartThings Token ein",
+        "data": {
+          "smartthings_access_token": "Personal Access Token"
         }
       },
       "tizen_local": {
-        "title": "Lokales TV-Setup",
-        "description": "Verbinden Sie sich direkt mit Ihrem TV über das lokale Netzwerk",
+        "title": "Lokales TV Setup",
+        "description": "Verbinde dich direkt mit deinem TV über das lokale Netzwerk",
         "data": {
           "local_ip": "TV IP-Adresse",
-          "local_psk": "Vorher geteilter Schlüssel (optional)",
+          "local_psk": "Pre-Shared Key (optional)",
           "device_name": "Gerätename"
         }
       },
       "select_device": {
         "title": "Gerät auswählen",
-        "description": "Wählen Sie welchen Samsung TV Sie steuern möchten",
+        "description": "Wähle welchen Samsung TV du steuern möchtest",
         "data": {
           "device_id": "TV-Gerät"
         }
       }
     },
     "error": {
-      "invalid_token": "Ungültiges SmartThings-Token",
+      "invalid_token": "Ungültiger SmartThings Token",
       "connection_error": "Verbindungsfehler aufgetreten",
-      "no_devices_found": "Keine Samsung TVs in Ihrem SmartThings-Konto gefunden",
-      "connection_failed": "Verbindung zum TV fehlgeschlagen"
+      "no_devices_found": "Keine Samsung TVs in deinem SmartThings-Konto gefunden",
+      "connection_failed": "Verbindung zum TV fehlgeschlagen",
+      "missing_credentials": "Client ID und Client Secret sind erforderlich",
+      "invalid_state": "Ungültiger OAuth State - möglicher Sicherheitsverstoß",
+      "no_code": "Kein Authorization Code von SmartThings erhalten",
+      "token_exchange_failed": "Token-Austausch fehlgeschlagen",
+      "redirect_uri_mismatch": "Redirect URI stimmt nicht überein"
+    },
+    "abort": {
+      "invalid_state": "OAuth State ungültig - mögliche CSRF-Attacke",
+      "no_code": "Kein Authorization Code erhalten",
+      "token_exchange_failed": "Token-Austausch fehlgeschlagen. Fehler: {error}\n\nRedirect URI: {redirect_uri}",
+      "redirect_uri_mismatch": "Die Redirect URI in SmartThings stimmt nicht überein!\n\nErwartet wird EXAKT:\n{redirect_uri}\n\nBitte prüfe in SmartThings Developer Console unter 'OAuth Settings'.",
+      "no_devices_found": "Keine Samsung TVs gefunden",
+      "oauth_error_access_denied": "Zugriff verweigert - Du hast die Autorisierung abgelehnt"
     }
   },
   "entity": {
