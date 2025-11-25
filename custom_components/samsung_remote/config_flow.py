@@ -129,6 +129,18 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Setup OAuth credentials."""
         errors: dict[str, str] = {}
+        
+        # Get the correct redirect URI
+        if self.hass.config.external_url:
+            base_url = self.hass.config.external_url
+        elif self.hass.config.internal_url:
+            base_url = self.hass.config.internal_url
+        else:
+            # Fallback to local URL
+            base_url = "http://homeassistant.local:8123"
+        
+        # Use Home Assistant's OAuth callback endpoint
+        redirect_uri = f"{base_url}/auth/external/callback"
 
         if user_input is not None:
             self.smartthings_client_id = user_input["client_id"].strip()
@@ -140,9 +152,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # Generate OAuth state for security
                 self.oauth_state = secrets.token_urlsafe(32)
                 
-                # Build authorization URL
-                redirect_uri = f"{self.hass.config.external_url}/auth/external/callback"
-                
                 auth_params = {
                     "client_id": self.smartthings_client_id,
                     "redirect_uri": redirect_uri,
@@ -153,6 +162,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 
                 auth_url = f"{SMARTTHINGS_OAUTH_AUTHORIZE_URL}?{urlencode(auth_params)}"
                 
+                LOGGER.info(f"OAuth Redirect URI: {redirect_uri}")
                 LOGGER.info(f"OAuth Authorization URL: {auth_url}")
                 
                 return self.async_external_step(
@@ -170,29 +180,36 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ),
             errors=errors,
             description_placeholders={
+                "redirect_uri": redirect_uri,
                 "setup_instructions": 
                 "# SmartThings OAuth Setup\n\n"
-                "## Step 1: Register a SmartThings App\n\n"
-                "1. Go to: https://smartthings.developer.samsung.com/workspace/projects\n"
-                "2. Click **'New Project'**\n"
-                "3. Project Name: `Home Assistant Integration`\n"
-                "4. Click **'Register App'**\n"
-                "5. Select **'Webhook Endpoint'**\n"
-                "6. App Name: `Home Assistant`\n"
-                "7. Target URL: `https://your-home-assistant-url/api/webhook/smartthings`\n"
-                "8. Scopes: Select ALL of these:\n"
-                "   - ☑ `r:devices:*`\n"
-                "   - ☑ `x:devices:*`\n"
-                "9. Click **'Save'**\n\n"
-                "## Step 2: Get OAuth Credentials\n\n"
-                "1. Click on your newly created app\n"
-                "2. Go to **'OAuth Settings'** tab\n"
-                "3. Add Redirect URI: `" + (self.hass.config.external_url or "http://homeassistant.local:8123") + "/auth/external/callback`\n"
-                "4. Click **'Generate OAuth Client'**\n"
-                "5. Copy the **Client ID** and **Client Secret**\n"
-                "6. Paste them below\n\n"
-                "⚠️ **Important**: Keep Client Secret safe and never share it!\n\n"
-                "📖 Full guide: https://github.com/Qlimuli/samsung-tv-remote-HA/blob/main/docs/OAUTH_SETUP.md"
+                "## ⚠️ WICHTIG: Deine Redirect URI\n\n"
+                f"Kopiere diese URI EXAKT in SmartThings:\n"
+                f"```\n{redirect_uri}\n```\n\n"
+                "## Schritt 1: SmartThings Developer Account\n\n"
+                "1. Gehe zu: https://smartthings.developer.samsung.com/workspace/projects\n"
+                "2. Klicke **'New Project'**\n"
+                "3. Project Name: `Home Assistant`\n"
+                "4. Project Type: **Automation**\n"
+                "5. Klicke **'Create Project'**\n\n"
+                "## Schritt 2: App registrieren\n\n"
+                "1. Klicke **'Register App'**\n"
+                "2. App Type: **Webhook Endpoint**\n"
+                "3. App Name: `Home Assistant Samsung Remote`\n"
+                "4. Target URL: `https://your-ha-url/api/webhook/smartthings` (beliebig)\n"
+                "5. Scopes: ☑️ `r:devices:*` und ☑️ `x:devices:*`\n"
+                "6. Klicke **'Register App'**\n\n"
+                "## Schritt 3: OAuth Client erstellen\n\n"
+                "1. Gehe zum Tab **'OAuth Settings'**\n"
+                "2. Klicke **'Add OAuth Client'**\n"
+                "3. **Redirect URI**: Kopiere die URI oben EXAKT!\n"
+                f"   ```\n   {redirect_uri}\n   ```\n"
+                "4. Klicke **'Generate OAuth Client'**\n"
+                "5. Kopiere **Client ID** und **Client Secret**\n"
+                "6. ⚠️ Client Secret wird nur EINMAL angezeigt!\n\n"
+                "## Schritt 4: Hier eintragen\n\n"
+                "Trage Client ID und Client Secret unten ein.\n\n"
+                f"**Deine Redirect URI nochmal**: `{redirect_uri}`"
             },
         )
 
@@ -202,9 +219,35 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle OAuth callback."""
         errors: dict[str, str] = {}
         
+        # Calculate redirect URI (same as in oauth_setup)
+        if self.hass.config.external_url:
+            base_url = self.hass.config.external_url
+        elif self.hass.config.internal_url:
+            base_url = self.hass.config.internal_url
+        else:
+            base_url = "http://homeassistant.local:8123"
+        
+        redirect_uri = f"{base_url}/auth/external/callback"
+        
         if user_input is not None:
             code = user_input.get("code")
             state = user_input.get("state")
+            error = user_input.get("error")
+            
+            if error:
+                LOGGER.error(f"OAuth error from SmartThings: {error}")
+                if error == "redirect_uri_mismatch":
+                    return self.async_abort(
+                        reason="redirect_uri_mismatch",
+                        description_placeholders={
+                            "redirect_uri": redirect_uri,
+                            "error_detail": 
+                                f"Die Redirect URI in SmartThings stimmt nicht überein!\n\n"
+                                f"Erwartet wird EXAKT:\n{redirect_uri}\n\n"
+                                f"Bitte prüfe in SmartThings Developer Console unter 'OAuth Settings'."
+                        }
+                    )
+                return self.async_abort(reason=f"oauth_error_{error}")
             
             # Verify state to prevent CSRF
             if state != self.oauth_state:
@@ -225,7 +268,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     client_secret=self.smartthings_client_secret,
                 )
                 
-                redirect_uri = f"{self.hass.config.external_url}/auth/external/callback"
+                LOGGER.info(f"Exchanging code for tokens with redirect_uri: {redirect_uri}")
                 
                 tokens = await api.exchange_code_for_tokens(code, redirect_uri)
                 
@@ -256,7 +299,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except Exception as e:
                 LOGGER.error(f"OAuth token exchange failed: {e}", exc_info=True)
                 errors["base"] = "token_exchange_failed"
-                return self.async_abort(reason="token_exchange_failed")
+                return self.async_abort(
+                    reason="token_exchange_failed",
+                    description_placeholders={
+                        "error": str(e),
+                        "redirect_uri": redirect_uri
+                    }
+                )
 
         return self.async_show_form(
             step_id="smartthings_oauth_callback",
