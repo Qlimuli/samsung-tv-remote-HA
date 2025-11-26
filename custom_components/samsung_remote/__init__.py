@@ -22,6 +22,18 @@ from .const import (
 PLATFORMS: Final = ["remote", "button"]
 
 
+def get_smartthings_token(hass: HomeAssistant) -> str | None:
+    """Get SmartThings API token from existing SmartThings integration."""
+    if "smartthings" not in hass.data:
+        return None
+    
+    for entry in hass.config_entries.async_entries("smartthings"):
+        if entry.data.get("access_token"):
+            return entry.data["access_token"]
+    
+    return None
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Samsung Remote from a config entry."""
 
@@ -31,10 +43,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         api_method = entry.data.get(CONF_API_METHOD, "smartthings")
 
         if api_method == "smartthings":
-            token = entry.data.get(CONF_SMARTTHINGS_TOKEN)
-
-            if not token:
-                raise ConfigEntryNotReady("SmartThings token missing")
+            # Check if using existing SmartThings integration
+            use_existing_st = entry.data.get("use_existing_smartthings", False)
+            
+            if use_existing_st:
+                # Get token from existing SmartThings integration
+                token = get_smartthings_token(hass)
+                if not token:
+                    raise ConfigEntryNotReady(
+                        "SmartThings integration not found or not configured. "
+                        "Please set up SmartThings integration first."
+                    )
+                LOGGER.info("Using token from existing SmartThings integration")
+            else:
+                # Use manually provided token
+                token = entry.data.get(CONF_SMARTTHINGS_TOKEN)
+                if not token:
+                    raise ConfigEntryNotReady("SmartThings token missing")
 
             api = SmartThingsAPI(hass, token=token)
 
