@@ -14,10 +14,7 @@ from .const import (
     CONF_DEVICE_NAME,
     CONF_LOCAL_IP,
     CONF_LOCAL_PSK,
-    CONF_SMARTTHINGS_ACCESS_TOKEN,
-    CONF_SMARTTHINGS_REFRESH_TOKEN,
     CONF_SMARTTHINGS_TOKEN,
-    CONF_SMARTTHINGS_TOKEN_EXPIRES,
     DOMAIN,
     LOGGER,
 )
@@ -34,32 +31,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         api_method = entry.data.get(CONF_API_METHOD, "smartthings")
 
         if api_method == "smartthings":
-            access_token = entry.data.get(CONF_SMARTTHINGS_ACCESS_TOKEN)
-            refresh_token = entry.data.get(CONF_SMARTTHINGS_REFRESH_TOKEN)
-            token_expires = entry.data.get(CONF_SMARTTHINGS_TOKEN_EXPIRES)
+            token = entry.data.get(CONF_SMARTTHINGS_TOKEN)
 
-            # Fallback to old PAT format if no OAuth tokens present
-            if not access_token:
-                access_token = entry.data.get(CONF_SMARTTHINGS_TOKEN)
-
-            if not access_token:
+            if not token:
                 raise ConfigEntryNotReady("SmartThings token missing")
 
-            api = SmartThingsAPI(
-                hass,
-                access_token=access_token,
-                refresh_token=refresh_token,
-                token_expires=token_expires,
-            )
-
-            if refresh_token:
-                LOGGER.info("SmartThings OAuth configured with refresh token - tokens will auto-refresh")
-            else:
-                LOGGER.warning("SmartThings configured without refresh token - access token will expire in 24 hours")
+            api = SmartThingsAPI(hass, token=token)
 
             # Validate token
             if not await api.validate_token():
-                # If we get here, it means 401 or explicit failure, NOT a network error
                 LOGGER.error("SmartThings token validation failed during startup. Integration will not be set up.")
                 raise ConfigEntryNotReady("Invalid SmartThings token")
         else:
