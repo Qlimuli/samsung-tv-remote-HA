@@ -5,6 +5,7 @@ from typing import Final
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import config_entry_oauth2_flow
 
 from .api.smartthings import SmartThingsAPI
 from .api.tizen_local import TizenLocalAPI
@@ -14,7 +15,6 @@ from .const import (
     CONF_DEVICE_NAME,
     CONF_LOCAL_IP,
     CONF_LOCAL_PSK,
-    CONF_SMARTTHINGS_TOKEN,
     DOMAIN,
     LOGGER,
 )
@@ -22,15 +22,44 @@ from .const import (
 PLATFORMS: Final = ["remote", "button"]
 
 
-def get_smartthings_token(hass: HomeAssistant) -> str | None:
+async def get_smartthings_token(hass: HomeAssistant) -> str | None:
     """Get SmartThings API token from existing SmartThings integration."""
     if "smartthings" not in hass.data:
+        LOGGER.debug("SmartThings integration not found in hass.data")
         return None
     
+    # Try to get token from SmartThings integration entries
     for entry in hass.config_entries.async_entries("smartthings"):
+        LOGGER.debug(f"Checking SmartThings entry: {entry.entry_id}")
+        
+        # Check if entry has data with access_token
         if entry.data.get("access_token"):
+            LOGGER.info("Found access_token in SmartThings entry data")
             return entry.data["access_token"]
+        
+        # Check if entry uses OAuth2 implementation
+        if entry.data.get("auth_implementation"):
+            try:
+                # Get OAuth2 session from implementation
+                implementation = await config_entry_oauth2_flow.async_get_config_entry_implementation(
+                    hass, entry
+                )
+                if implementation:
+                    session = config_entry_oauth2_flow.OAuth2Session(hass, entry, implementation)
+                    token_data = await session.async_ensure_token_valid()
+                    if token_data and "access_token" in token_data:
+                        LOGGER.info("Retrieved access_token from OAuth2 session")
+                        return token_data["access_token"]
+            except Exception as e:
+                LOGGER.warning(f"Could not retrieve OAuth2 token: {e}")
+        
+        # Check runtime_data if available (Home Assistant 2024.x+)
+        if hasattr(entry, "runtime_data") and entry.runtime_data:
+            if hasattr(entry.runtime_data, "token"):
+                LOGGER.info("Found token in entry.runtime_data")
+                return entry.runtime_data.token
     
+    LOGGER.warning("No valid SmartThings token found in any entry")
     return None
 
 
@@ -43,31 +72,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         api_method = entry.data.get(CONF_API_METHOD, "smartthings")
 
         if api_method == "smartthings":
-            # Check if using existing SmartThings integration
-            use_existing_st = entry.data.get("use_existing_smartthings", False)
+            # Always try to use existing SmartThings integration
+            token = await get_smartthings_token(hass)
             
-            if use_existing_st:
-                # Get token from existing SmartThings integration
-                token = get_smartthings_token(hass)
-                if not token:
-                    raise ConfigEntryNotReady(
-                        "SmartThings integration not found or not configured. "
-                        "Please set up SmartThings integration first."
-                    )
-                LOGGER.info("Using token from existing SmartThings integration")
-            else:
-                # Use manually provided token
-                token = entry.data.get(CONF_SMARTTHINGS_TOKEN)
-                if not token:
-                    raise ConfigEntryNotReady("SmartThings token missing")
-
+            if not token:
+                raise ConfigEntryNotReady(
+                    "SmartThings integration not found or not configured. "
+                    "Please set up the native SmartThings integration first via "
+                    "Settings > Devices & Services > Add Integration > SmartThings"
+                )
+            
+            LOGGER.info("Using token from existing SmartThings integration")
             api = SmartThingsAPI(hass, token=token)
 
             # Validate token
             if not await api.validate_token():
-                LOGGER.error("SmartThings token validation failed during startup. Integration will not be set up.")
-                raise ConfigEntryNotReady("Invalid SmartThings token")
+                LOGGER.error("SmartThings token validation failed. Please reconfigure SmartThings integration.")
+                raise ConfigEntryNotReady(
+                    "SmartThings token invalid. Please reconfigure the SmartThings integration."
+                )
         else:
+            # Tizen Local API
             ip = entry.data.get(CONF_LOCAL_IP)
             if not ip:
                 raise ConfigEntryNotReady("Local IP missing")
@@ -90,8 +115,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         return True
 
+    except ConfigEntryNotReady:
+        raise
     except Exception as e:
-        LOGGER.error(f"Error setting up Samsung Remote: {e}")
+        LOGGER.error(f"Error setting up Samsung Remote: {e}", exc_info=True)
         raise ConfigEntryNotReady(str(e))
 
 
