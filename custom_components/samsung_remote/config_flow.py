@@ -1,10 +1,8 @@
 """Config flow for Samsung Remote integration."""
 
-import time
 from typing import Any, Optional
 
 import voluptuous as vol
-from aiohttp import ClientConnectorDNSError
 
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
@@ -19,11 +17,22 @@ from .const import (
     CONF_DEVICE_NAME,
     CONF_LOCAL_IP,
     CONF_LOCAL_PSK,
-    CONF_SMARTTHINGS_TOKEN,
     DEFAULT_API_METHOD,
     DOMAIN,
     LOGGER,
 )
+
+
+async def get_smartthings_token(hass: HomeAssistant) -> str | None:
+    """Get SmartThings API token from existing SmartThings integration."""
+    if "smartthings" not in hass.data:
+        return None
+    
+    for entry in hass.config_entries.async_entries("smartthings"):
+        if entry.data.get("access_token"):
+            return entry.data["access_token"]
+    
+    return None
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -41,7 +50,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self.api_method = DEFAULT_API_METHOD
         self.smartthings_api: Optional[SmartThingsAPI] = None
         self.devices: list[dict[str, Any]] = []
-        self.smartthings_token: Optional[str] = None
 
     async def async_step_user(
         self, user_input: Optional[dict[str, Any]] = None
@@ -68,7 +76,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ),
             errors=errors,
             description_placeholders={
-                "info": "Choose your connection method"
+                "info": "Choose your connection method.\n\n"
+                "SmartThings: Uses the native Home Assistant SmartThings integration.\n"
+                "Tizen Local: Direct connection to TV via local network."
             },
         )
 
@@ -78,53 +88,53 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle SmartThings API setup."""
         errors: dict[str, str] = {}
 
-        if user_input is not None:
+        # Check if SmartThings integration exists
+        token = await get_smartthings_token(self.hass)
+        
+        if not token:
+            return self.async_abort(
+                reason="smartthings_not_configured",
+                description_placeholders={
+                    "info": "The native SmartThings integration is not set up.\n\n"
+                    "Please set it up first:\n"
+                    "1. Go to Settings > Devices & Services\n"
+                    "2. Click 'Add Integration'\n"
+                    "3. Search for 'SmartThings'\n"
+                    "4. Follow the setup instructions\n"
+                    "5. Then come back to add this Samsung Remote integration"
+                }
+            )
+
+        if user_input is not None or True:  # Auto-proceed since we have token
             try:
-                token = user_input[CONF_SMARTTHINGS_TOKEN].strip()
+                LOGGER.info("Using existing SmartThings integration token")
                 
-                if not token:
-                    errors["base"] = "invalid_token"
-                    LOGGER.error("Token is empty")
-                    raise ValueError("Token is required")
-
-                # Check token length and format
-                if len(token) < 10:
-                    errors["base"] = "invalid_token"
-                    LOGGER.error(f"Token too short (length: {len(token)})")
-                    raise ValueError("Token appears to be invalid (too short)")
-
-                # Check for common invalid characters
-                if any(char in token for char in ['\n', '\r', '\t', '  ']):
-                    errors["base"] = "invalid_token"
-                    LOGGER.error("Token contains invalid whitespace characters")
-                    raise ValueError("Token contains invalid whitespace")
-
-                LOGGER.info(f"Validating SmartThings token (length: {len(token)}, first 20: {token[:20]}...)")
-                
-                self.smartthings_api = SmartThingsAPI(
-                    self.hass,
-                    token=token,
-                )
+                self.smartthings_api = SmartThingsAPI(self.hass, token=token)
 
                 # Validate token
-                LOGGER.info("Starting token validation...")
                 if not await self.smartthings_api.validate_token():
-                    errors["base"] = "invalid_token" 
-                    LOGGER.error(f"Token validation failed for token: {token[:20]}...")
+                    errors["base"] = "invalid_token"
+                    LOGGER.error("Token validation failed")
                 else:
                     # Fetch devices
                     LOGGER.info("Token validation successful, fetching devices...")
                     try:
                         self.devices = await self.smartthings_api.get_devices()
                     except Exception as e:
-                        LOGGER.warning(f"Could not fetch devices during setup (possible network issue): {e}")
+                        LOGGER.warning(f"Could not fetch devices: {e}")
                         self.devices = []
 
                     if not self.devices:
-                        pass
-
-                    # Store token
-                    self.smartthings_token = token
+                        return self.async_abort(
+                            reason="no_devices_found",
+                            description_placeholders={
+                                "info": "No Samsung TVs found in your SmartThings account.\n\n"
+                                "Make sure your TV is:\n"
+                                "1. Connected to the same Samsung account\n"
+                                "2. Powered on and connected to the network\n"
+                                "3. Visible in the SmartThings mobile app"
+                            }
+                        )
                         
                     LOGGER.info(f"SmartThings setup successful. Found {len(self.devices)} devices")
 
@@ -132,9 +142,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     await self.smartthings_api.close()
                     return await self.async_step_select_device()
 
-            except ClientConnectorDNSError:
-                LOGGER.error("DNS/Network error during SmartThings setup")
-                errors["base"] = "connection_error"
             except Exception as e:
                 LOGGER.error(f"SmartThings validation error: {e}", exc_info=True)
                 errors["base"] = "connection_error"
@@ -144,32 +151,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="smartthings",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_SMARTTHINGS_TOKEN): str,
-                }
-            ),
+            data_schema=vol.Schema({}),  # No input needed
             errors=errors,
             description_placeholders={
-                "token_help": "SmartThings Personal Access Token Setup:\n\n"
-                "1. Go to https://account.smartthings.com/tokens\n"
-                "2. Click 'Generate new token'\n"
-                "3. Give it a name (e.g. 'Home Assistant')\n"
-                "4. Select BOTH scopes:\n"
-                "   - r:devices:* (Read access)\n"
-                "   - x:devices:* (Execute access)\n"
-                "5. Click 'Generate token'\n"
-                "6. Copy the token and paste it below\n\n"
-                "IMPORTANT: YOU MUST SELECT BOTH SCOPES!\n\n"
-                "Token Format:\n"
-                "- Usually 40+ characters long\n"
-                "- NO leading or trailing spaces\n"
-                "- NO newlines or tabs\n\n"
-                "Troubleshooting:\n"
-                "- Check token is copied correctly\n"
-                "- Verify TV is in SmartThings account\n"
-                "- Ensure both scopes are selected\n"
-                "- Check token hasn't expired"
+                "info": "Using token from native SmartThings integration.\n\n"
+                "Click Submit to discover your Samsung TVs."
             },
         )
 
@@ -215,7 +201,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ),
             errors=errors,
             description_placeholders={
-                "ip_help": "Enter the IP address of your Samsung TV. No token needed."
+                "ip_help": "Enter the IP address of your Samsung TV.\n\n"
+                "You can find this in:\n"
+                "TV Settings > Network > Network Status > IP Address"
             },
         )
 
@@ -234,7 +222,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     device_name=device.get("label", device_id),
                     device_id=device_id,
                     api_method="smartthings",
-                    smartthings_token=self.smartthings_token,
                 )
 
         if not self.devices:
@@ -250,7 +237,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {vol.Required(CONF_DEVICE_ID): vol.In(device_options)}
             ),
             description_placeholders={
-                "device_count": str(len(self.devices))
+                "device_count": str(len(self.devices)),
+                "info": f"Found {len(self.devices)} Samsung TV(s) in your SmartThings account.\n\n"
+                "Select the TV you want to control:"
             },
         )
 
@@ -269,9 +258,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         }
 
         # Add method-specific data
-        if kwargs[CONF_API_METHOD] == "smartthings":
-            entry_data[CONF_SMARTTHINGS_TOKEN] = kwargs.get(CONF_SMARTTHINGS_TOKEN)
-        else:
+        if kwargs[CONF_API_METHOD] == "tizen_local":
             entry_data[CONF_LOCAL_IP] = kwargs.get(CONF_LOCAL_IP)
             entry_data[CONF_LOCAL_PSK] = kwargs.get(CONF_LOCAL_PSK, "")
 
@@ -286,43 +273,29 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
-        pass
+        self.config_entry = config_entry
 
     async def async_step_init(
         self, user_input: Optional[dict[str, Any]] = None
     ) -> FlowResult:
         """Manage the options."""
-        errors: dict[str, str] = {}
-
         api_method = self.config_entry.data.get(CONF_API_METHOD, "smartthings")
 
-        if user_input is not None:
-            # Update based on API method
-            if api_method == "smartthings":
-                token = user_input.get(CONF_SMARTTHINGS_TOKEN, "").strip()
-
-                if token:
-                    # Validate new token
-                    try:
-                        api = SmartThingsAPI(self.hass, token=token)
-                        if await api.validate_token():
-                            await api.close()
-                            # Update config entry with new token
-                            new_data = {**self.config_entry.data}
-                            new_data[CONF_SMARTTHINGS_TOKEN] = token
-                            self.hass.config_entries.async_update_entry(
-                                self.config_entry,
-                                data=new_data,
-                            )
-                            return self.async_create_entry(title="", data={})
-                        else:
-                            errors["base"] = "invalid_token"
-                            await api.close()
-                    except Exception as e:
-                        LOGGER.error(f"Token validation error: {e}")
-                        errors["base"] = "connection_error"
-            else:
-                # Tizen local options
+        if api_method == "smartthings":
+            return self.async_show_form(
+                step_id="init",
+                data_schema=vol.Schema({}),
+                description_placeholders={
+                    "info": "This integration uses the native SmartThings integration.\n\n"
+                    "To update settings, please reconfigure the SmartThings integration:\n"
+                    "Settings > Devices & Services > SmartThings > Configure"
+                },
+            )
+        else:
+            # Tizen local options
+            errors: dict[str, str] = {}
+            
+            if user_input is not None:
                 ip = user_input.get(CONF_LOCAL_IP, "").strip()
                 psk = user_input.get(CONF_LOCAL_PSK, "").strip()
 
@@ -348,37 +321,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         LOGGER.error(f"Connection validation error: {e}")
                         errors["base"] = "connection_error"
 
-        # Show form based on API method
-        if api_method == "smartthings":
-            current_token = self.config_entry.data.get(CONF_SMARTTHINGS_TOKEN, "")
-            
-            # Show masked token for security
-            masked_token = (
-                f"{'*' * (len(current_token) - 8)}{current_token[-8:]}"
-                if len(current_token) > 8
-                else "***"
-            )
-
-            return self.async_show_form(
-                step_id="init",
-                data_schema=vol.Schema(
-                    {
-                        vol.Required(
-                            CONF_SMARTTHINGS_TOKEN,
-                            description={"suggested_value": masked_token},
-                        ): str,
-                    }
-                ),
-                errors=errors,
-                description_placeholders={
-                    "current_method": "SmartThings API",
-                    "info": f"Update your Personal Access Token\n\n"
-                    f"Current Token: {masked_token}\n\n"
-                    f"Get a new token at:\nhttps://account.smartthings.com/tokens",
-                },
-            )
-        else:
-            # Tizen local options
             current_ip = self.config_entry.data.get(CONF_LOCAL_IP, "")
             current_psk = self.config_entry.data.get(CONF_LOCAL_PSK, "")
 
@@ -398,8 +340,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 ),
                 errors=errors,
                 description_placeholders={
-                    "current_method": "Local Tizen Connection",
-                    "info": "Update IP address or PSK.",
+                    "info": "Update your TV's IP address or PSK if needed."
                 },
             )
 
