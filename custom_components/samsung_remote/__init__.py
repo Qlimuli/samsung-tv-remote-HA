@@ -44,14 +44,28 @@ async def get_smartthings_token(hass: HomeAssistant) -> str | None:
         # Method 1: Check entry.data for access_token
         if "access_token" in entry.data:
             token = entry.data["access_token"]
-            LOGGER.info(f"Found access_token in entry.data (length: {len(token)})")
-            return token
+            # Token might be a dict with 'access_token' key
+            if isinstance(token, dict):
+                if "access_token" in token:
+                    token = token["access_token"]
+                    LOGGER.info(f"Found access_token in dict (length: {len(token)})")
+                    return token
+            elif isinstance(token, str):
+                LOGGER.info(f"Found access_token string in entry.data (length: {len(token)})")
+                return token
         
         # Method 2: Check entry.data for token
         if "token" in entry.data:
             token = entry.data["token"]
-            LOGGER.info(f"Found token in entry.data (length: {len(token)})")
-            return token
+            # Token might be a dict with 'access_token' key
+            if isinstance(token, dict):
+                if "access_token" in token:
+                    token = token["access_token"]
+                    LOGGER.info(f"Found access_token in token dict (length: {len(token)})")
+                    return token
+            elif isinstance(token, str):
+                LOGGER.info(f"Found token string in entry.data (length: {len(token)})")
+                return token
         
         # Method 3: Check runtime_data if available (HA 2024.x+)
         if hasattr(entry, "runtime_data") and entry.runtime_data:
