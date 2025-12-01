@@ -5,7 +5,6 @@ from typing import Final
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import config_entry_oauth2_flow
 
 from .api.smartthings import SmartThingsAPI
 from .api.tizen_local import TizenLocalAPI
@@ -24,42 +23,88 @@ PLATFORMS: Final = ["remote", "button"]
 
 async def get_smartthings_token(hass: HomeAssistant) -> str | None:
     """Get SmartThings API token from existing SmartThings integration."""
-    if "smartthings" not in hass.data:
-        LOGGER.debug("SmartThings integration not found in hass.data")
+    
+    # Check if smartthings integration is loaded
+    smartthings_entries = hass.config_entries.async_entries("smartthings")
+    
+    if not smartthings_entries:
+        LOGGER.warning("No SmartThings integration entries found")
         return None
     
-    # Try to get token from SmartThings integration entries
-    for entry in hass.config_entries.async_entries("smartthings"):
-        LOGGER.debug(f"Checking SmartThings entry: {entry.entry_id}")
-        
-        # Check if entry has data with access_token
-        if entry.data.get("access_token"):
-            LOGGER.info("Found access_token in SmartThings entry data")
-            return entry.data["access_token"]
-        
-        # Check if entry uses OAuth2 implementation
-        if entry.data.get("auth_implementation"):
-            try:
-                # Get OAuth2 session from implementation
-                implementation = await config_entry_oauth2_flow.async_get_config_entry_implementation(
-                    hass, entry
-                )
-                if implementation:
-                    session = config_entry_oauth2_flow.OAuth2Session(hass, entry, implementation)
-                    token_data = await session.async_ensure_token_valid()
-                    if token_data and "access_token" in token_data:
-                        LOGGER.info("Retrieved access_token from OAuth2 session")
-                        return token_data["access_token"]
-            except Exception as e:
-                LOGGER.warning(f"Could not retrieve OAuth2 token: {e}")
-        
-        # Check runtime_data if available (Home Assistant 2024.x+)
-        if hasattr(entry, "runtime_data") and entry.runtime_data:
-            if hasattr(entry.runtime_data, "token"):
-                LOGGER.info("Found token in entry.runtime_data")
-                return entry.runtime_data.token
+    LOGGER.info(f"Found {len(smartthings_entries)} SmartThings entries")
     
-    LOGGER.warning("No valid SmartThings token found in any entry")
+    for entry in smartthings_entries:
+        LOGGER.debug(f"Checking SmartThings entry: {entry.entry_id}, state: {entry.state}")
+        
+        # Skip entries that are not loaded
+        if entry.state.name != "LOADED":
+            LOGGER.debug(f"Skipping entry {entry.entry_id} - state is {entry.state.name}")
+            continue
+        
+        # Method 1: Check entry.data for access_token
+        if "access_token" in entry.data:
+            token = entry.data["access_token"]
+            LOGGER.info(f"Found access_token in entry.data (length: {len(token)})")
+            return token
+        
+        # Method 2: Check entry.data for token
+        if "token" in entry.data:
+            token = entry.data["token"]
+            LOGGER.info(f"Found token in entry.data (length: {len(token)})")
+            return token
+        
+        # Method 3: Check runtime_data if available (HA 2024.x+)
+        if hasattr(entry, "runtime_data") and entry.runtime_data:
+            LOGGER.debug("Entry has runtime_data")
+            
+            # Check for token attribute
+            if hasattr(entry.runtime_data, "token"):
+                token = entry.runtime_data.token
+                LOGGER.info(f"Found token in runtime_data.token (length: {len(token)})")
+                return token
+            
+            # Check for access_token attribute
+            if hasattr(entry.runtime_data, "access_token"):
+                token = entry.runtime_data.access_token
+                LOGGER.info(f"Found token in runtime_data.access_token (length: {len(token)})")
+                return token
+            
+            # If runtime_data is a dict
+            if isinstance(entry.runtime_data, dict):
+                if "token" in entry.runtime_data:
+                    token = entry.runtime_data["token"]
+                    LOGGER.info(f"Found token in runtime_data dict (length: {len(token)})")
+                    return token
+                if "access_token" in entry.runtime_data:
+                    token = entry.runtime_data["access_token"]
+                    LOGGER.info(f"Found access_token in runtime_data dict (length: {len(token)})")
+                    return token
+        
+        # Method 4: Try to get from hass.data
+        if "smartthings" in hass.data and entry.entry_id in hass.data["smartthings"]:
+            smartthings_data = hass.data["smartthings"][entry.entry_id]
+            LOGGER.debug(f"Found smartthings data in hass.data, type: {type(smartthings_data)}")
+            
+            # Check if it's a SmartThings API instance with token
+            if hasattr(smartthings_data, "token"):
+                token = smartthings_data.token
+                LOGGER.info(f"Found token in hass.data smartthings object (length: {len(token)})")
+                return token
+            
+            # Check if it's a dict
+            if isinstance(smartthings_data, dict):
+                if "token" in smartthings_data:
+                    token = smartthings_data["token"]
+                    LOGGER.info(f"Found token in hass.data dict (length: {len(token)})")
+                    return token
+                if "access_token" in smartthings_data:
+                    token = smartthings_data["access_token"]
+                    LOGGER.info(f"Found access_token in hass.data dict (length: {len(token)})")
+                    return token
+        
+        LOGGER.debug(f"Entry {entry.entry_id} checked, no token found in any location")
+    
+    LOGGER.error("No valid SmartThings token found in any entry after checking all methods")
     return None
 
 
@@ -70,27 +115,38 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     try:
         api_method = entry.data.get(CONF_API_METHOD, "smartthings")
+        LOGGER.info(f"Setting up Samsung Remote with method: {api_method}")
 
         if api_method == "smartthings":
             # Always try to use existing SmartThings integration
+            LOGGER.info("Attempting to get token from SmartThings integration...")
             token = await get_smartthings_token(hass)
             
             if not token:
-                raise ConfigEntryNotReady(
-                    "SmartThings integration not found or not configured. "
-                    "Please set up the native SmartThings integration first via "
-                    "Settings > Devices & Services > Add Integration > SmartThings"
+                error_msg = (
+                    "SmartThings integration not found or not configured.\n\n"
+                    "Please set up the native SmartThings integration first:\n"
+                    "1. Go to Settings > Devices & Services\n"
+                    "2. Click 'Add Integration'\n"
+                    "3. Search for 'SmartThings'\n"
+                    "4. Complete the setup\n"
+                    "5. Then try adding Samsung Remote again"
                 )
+                LOGGER.error(error_msg)
+                raise ConfigEntryNotReady(error_msg)
             
-            LOGGER.info("Using token from existing SmartThings integration")
+            LOGGER.info(f"Successfully obtained SmartThings token (length: {len(token)})")
             api = SmartThingsAPI(hass, token=token)
 
             # Validate token
+            LOGGER.info("Validating SmartThings token...")
             if not await api.validate_token():
-                LOGGER.error("SmartThings token validation failed. Please reconfigure SmartThings integration.")
+                LOGGER.error("SmartThings token validation failed")
                 raise ConfigEntryNotReady(
-                    "SmartThings token invalid. Please reconfigure the SmartThings integration."
+                    "SmartThings token is invalid. Please reconfigure the SmartThings integration."
                 )
+            
+            LOGGER.info("SmartThings token validated successfully")
         else:
             # Tizen Local API
             ip = entry.data.get(CONF_LOCAL_IP)
@@ -98,6 +154,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 raise ConfigEntryNotReady("Local IP missing")
 
             psk = entry.data.get(CONF_LOCAL_PSK, "")
+            LOGGER.info(f"Setting up Tizen Local API for {ip}")
             api = TizenLocalAPI(ip, psk)
 
             # Validate connection
@@ -110,9 +167,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "device_name": entry.data.get(CONF_DEVICE_NAME),
         }
 
+        LOGGER.info(f"Setting up platforms: {PLATFORMS}")
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
         entry.async_on_unload(entry.add_update_listener(async_reload_entry))
 
+        LOGGER.info("Samsung Remote setup completed successfully")
         return True
 
     except ConfigEntryNotReady:
@@ -124,6 +183,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    LOGGER.info(f"Unloading Samsung Remote entry: {entry.entry_id}")
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     if unload_ok and DOMAIN in hass.data and entry.entry_id in hass.data[DOMAIN]:
@@ -137,5 +197,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload config entry."""
+    LOGGER.info(f"Reloading Samsung Remote entry: {entry.entry_id}")
     await async_unload_entry(hass, entry)
     await async_setup_entry(hass, entry)
