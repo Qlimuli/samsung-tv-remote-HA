@@ -74,25 +74,41 @@ async def get_smartthings_token(hass: HomeAssistant) -> str | None:
             # Check for token attribute
             if hasattr(entry.runtime_data, "token"):
                 token = entry.runtime_data.token
-                LOGGER.info(f"Found token in runtime_data.token (length: {len(token)})")
-                return token
+                # Token might be a dict
+                if isinstance(token, dict) and "access_token" in token:
+                    token = token["access_token"]
+                if isinstance(token, str):
+                    LOGGER.info(f"Found token in runtime_data.token (length: {len(token)})")
+                    return token
             
             # Check for access_token attribute
             if hasattr(entry.runtime_data, "access_token"):
                 token = entry.runtime_data.access_token
-                LOGGER.info(f"Found token in runtime_data.access_token (length: {len(token)})")
-                return token
+                # Token might be a dict
+                if isinstance(token, dict) and "access_token" in token:
+                    token = token["access_token"]
+                if isinstance(token, str):
+                    LOGGER.info(f"Found token in runtime_data.access_token (length: {len(token)})")
+                    return token
             
             # If runtime_data is a dict
             if isinstance(entry.runtime_data, dict):
                 if "token" in entry.runtime_data:
                     token = entry.runtime_data["token"]
-                    LOGGER.info(f"Found token in runtime_data dict (length: {len(token)})")
-                    return token
+                    # Token might be a dict
+                    if isinstance(token, dict) and "access_token" in token:
+                        token = token["access_token"]
+                    if isinstance(token, str):
+                        LOGGER.info(f"Found token in runtime_data dict (length: {len(token)})")
+                        return token
                 if "access_token" in entry.runtime_data:
                     token = entry.runtime_data["access_token"]
-                    LOGGER.info(f"Found access_token in runtime_data dict (length: {len(token)})")
-                    return token
+                    # Token might be a dict
+                    if isinstance(token, dict) and "access_token" in token:
+                        token = token["access_token"]
+                    if isinstance(token, str):
+                        LOGGER.info(f"Found access_token in runtime_data dict (length: {len(token)})")
+                        return token
         
         # Method 4: Try to get from hass.data
         if "smartthings" in hass.data and entry.entry_id in hass.data["smartthings"]:
@@ -102,19 +118,31 @@ async def get_smartthings_token(hass: HomeAssistant) -> str | None:
             # Check if it's a SmartThings API instance with token
             if hasattr(smartthings_data, "token"):
                 token = smartthings_data.token
-                LOGGER.info(f"Found token in hass.data smartthings object (length: {len(token)})")
-                return token
+                # Token might be a dict
+                if isinstance(token, dict) and "access_token" in token:
+                    token = token["access_token"]
+                if isinstance(token, str):
+                    LOGGER.info(f"Found token in hass.data smartthings object (length: {len(token)})")
+                    return token
             
             # Check if it's a dict
             if isinstance(smartthings_data, dict):
                 if "token" in smartthings_data:
                     token = smartthings_data["token"]
-                    LOGGER.info(f"Found token in hass.data dict (length: {len(token)})")
-                    return token
+                    # Token might be a dict
+                    if isinstance(token, dict) and "access_token" in token:
+                        token = token["access_token"]
+                    if isinstance(token, str):
+                        LOGGER.info(f"Found token in hass.data dict (length: {len(token)})")
+                        return token
                 if "access_token" in smartthings_data:
                     token = smartthings_data["access_token"]
-                    LOGGER.info(f"Found access_token in hass.data dict (length: {len(token)})")
-                    return token
+                    # Token might be a dict
+                    if isinstance(token, dict) and "access_token" in token:
+                        token = token["access_token"]
+                    if isinstance(token, str):
+                        LOGGER.info(f"Found access_token in hass.data dict (length: {len(token)})")
+                        return token
         
         LOGGER.debug(f"Entry {entry.entry_id} checked, no token found in any location")
     
