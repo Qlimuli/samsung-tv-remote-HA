@@ -1,12 +1,12 @@
 {
   "domain": "samsung_remote",
   "name": "Samsung Remote",
-  "codeowners": ["@v0-samsung-remote"],
+  "codeowners": ["@Qlimuli"],
   "config_flow": true,
-  "documentation": "https://github.com/Qlimuli/hacs-samsung-remote",
-  "integration_type": "device",
-  "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/Qlimuli/samsung-remote/issues",
-  "requirements": ["aiohttp>=3.8.0"],
-  "version": "1.0.0"
+  "dependencies": [],
+  "documentation": "https://github.com/Qlimuli/samsung-tv-remote-HA",
+  "iot_class": "cloud_push",
+  "issue_tracker": "https://github.com/Qlimuli/samsung-tv-remote-HA/issues",
+  "requirements": [],
+  "version": "1.1.0"
 }
