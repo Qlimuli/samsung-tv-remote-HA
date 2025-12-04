@@ -2,121 +2,49 @@
   "config": {
     "step": {
       "user": {
-        "title": "Samsung Remote Setup",
-        "description": "Wähle deine Verbindungsmethode",
+        "title": "Samsung Remote Einrichtung",
+        "description": "Wähle deine Verbindungsmethode. SmartThings API wird empfohlen und benötigt die native SmartThings Integration.",
         "data": {
-          "api_method": "Verbindungsmethode"
+          "connection_method": "Verbindungsmethode"
         }
       },
-      "smartthings_method": {
-        "title": "SmartThings Authentifizierung",
-        "description": "Wähle deine Authentifizierungsmethode",
+      "smartthings": {
+        "title": "SmartThings API Einrichtung",
+        "description": "Wähle deinen Samsung TV aus deinem SmartThings-Konto. Stelle sicher, dass die native SmartThings Integration konfiguriert ist.",
         "data": {
-          "method": "Methode"
+          "device_id": "Samsung TV"
         }
       },
-      "smartthings_oauth_setup": {
-        "title": "SmartThings OAuth Setup",
-        "description": "Gib deine OAuth Credentials ein",
+      "local": {
+        "title": "Lokale Tizen Einrichtung",
+        "description": "Gib die IP-Adresse deines TVs für lokale Steuerung ein.",
         "data": {
-          "client_id": "Client ID",
-          "client_secret": "Client Secret"
-        }
-      },
-      "smartthings_pat": {
-        "title": "SmartThings Personal Access Token",
-        "description": "Gib deinen SmartThings Token ein",
-        "data": {
-          "smartthings_access_token": "Personal Access Token"
-        }
-      },
-      "tizen_local": {
-        "title": "Lokales TV Setup",
-        "description": "Verbinde dich direkt mit deinem TV über das lokale Netzwerk",
-        "data": {
-          "local_ip": "TV IP-Adresse",
-          "local_psk": "Pre-Shared Key (optional)",
-          "device_name": "Gerätename"
-        }
-      },
-      "select_device": {
-        "title": "Gerät auswählen",
-        "description": "Wähle welchen Samsung TV du steuern möchtest",
-        "data": {
-          "device_id": "TV-Gerät"
+          "host": "TV IP-Adresse",
+          "name": "TV Name"
         }
       }
     },
     "error": {
-      "invalid_token": "Ungültiger SmartThings Token",
-      "connection_error": "Verbindungsfehler aufgetreten",
-      "no_devices_found": "Keine Samsung TVs in deinem SmartThings-Konto gefunden",
-      "connection_failed": "Verbindung zum TV fehlgeschlagen",
-      "missing_credentials": "Client ID und Client Secret sind erforderlich",
-      "invalid_state": "Ungültiger OAuth State - möglicher Sicherheitsverstoß",
-      "no_code": "Kein Authorization Code von SmartThings erhalten",
-      "token_exchange_failed": "Token-Austausch fehlgeschlagen",
-      "redirect_uri_mismatch": "Redirect URI stimmt nicht überein"
+      "cannot_connect": "Verbindung zum TV fehlgeschlagen. Bitte überprüfe deine Einstellungen.",
+      "no_devices": "Keine Samsung TVs in deinem SmartThings-Konto gefunden.",
+      "smartthings_not_configured": "SmartThings Integration ist nicht konfiguriert. Bitte richte sie zuerst ein.",
+      "invalid_auth": "Ungültige Authentifizierung. Bitte überprüfe deine Anmeldedaten.",
+      "unknown": "Ein unbekannter Fehler ist aufgetreten."
     },
     "abort": {
-      "invalid_state": "OAuth State ungültig - mögliche CSRF-Attacke",
-      "no_code": "Kein Authorization Code erhalten",
-      "token_exchange_failed": "Token-Austausch fehlgeschlagen. Fehler: {error}\n\nRedirect URI: {redirect_uri}",
-      "redirect_uri_mismatch": "Die Redirect URI in SmartThings stimmt nicht überein!\n\nErwartet wird EXAKT:\n{redirect_uri}\n\nBitte prüfe in SmartThings Developer Console unter 'OAuth Settings'.",
-      "no_devices_found": "Keine Samsung TVs gefunden",
-      "oauth_error_access_denied": "Zugriff verweigert - Du hast die Autorisierung abgelehnt"
+      "already_configured": "Dieser TV ist bereits konfiguriert.",
+      "no_devices_found": "Keine Samsung TVs gefunden."
     }
   },
-  "entity": {
-    "button": {
-      "power": {"name": "Ein/Aus"},
-      "poweroff": {"name": "Ausschalten"},
-      "volume_up": {"name": "Lautstärke +"},
-      "volume_down": {"name": "Lautstärke -"},
-      "mute": {"name": "Stumm"},
-      "channel_up": {"name": "Kanal +"},
-      "channel_down": {"name": "Kanal -"},
-      "previous_channel": {"name": "Vorheriger Kanal"},
-      "home": {"name": "Home"},
-      "menu": {"name": "Menü"},
-      "back": {"name": "Zurück"},
-      "exit": {"name": "Beenden"},
-      "up": {"name": "Hoch"},
-      "down": {"name": "Runter"},
-      "left": {"name": "Links"},
-      "right": {"name": "Rechts"},
-      "enter": {"name": "Bestätigen"},
-      "play": {"name": "Abspielen"},
-      "pause": {"name": "Pause"},
-      "stop": {"name": "Stopp"},
-      "rewind": {"name": "Zurückspulen"},
-      "fast_forward": {"name": "Vorspulen"},
-      "source": {"name": "Quelle"},
-      "hdmi1": {"name": "HDMI 1"},
-      "hdmi2": {"name": "HDMI 2"},
-      "hdmi3": {"name": "HDMI 3"},
-      "hdmi4": {"name": "HDMI 4"},
-      "guide": {"name": "Programmführer"},
-      "channel_list": {"name": "Kanalliste"},
-      "tools": {"name": "Extras"},
-      "info": {"name": "Info"},
-      "settings": {"name": "Einstellungen"},
-      "picture_mode": {"name": "Bildmodus"},
-      "sound_mode": {"name": "Tonmodus"},
-      "number_0": {"name": "Nummer 0"},
-      "number_1": {"name": "Nummer 1"},
-      "number_2": {"name": "Nummer 2"},
-      "number_3": {"name": "Nummer 3"},
-      "number_4": {"name": "Nummer 4"},
-      "number_5": {"name": "Nummer 5"},
-      "number_6": {"name": "Nummer 6"},
-      "number_7": {"name": "Nummer 7"},
-      "number_8": {"name": "Nummer 8"},
-      "number_9": {"name": "Nummer 9"},
-      "red": {"name": "Rote Taste"},
-      "green": {"name": "Grüne Taste"},
-      "yellow": {"name": "Gelbe Taste"},
-      "blue": {"name": "Blaue Taste"}
+  "options": {
+    "step": {
+      "init": {
+        "title": "Samsung Remote Optionen",
+        "data": {
+          "refresh_token_on_start": "Token beim Start von Home Assistant aktualisieren",
+          "scan_interval": "Aktualisierungsintervall (Sekunden)"
+        }
+      }
     }
   }
 }
