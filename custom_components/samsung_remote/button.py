@@ -1,4 +1,5 @@
-"""Button entities for Samsung TV commands."""
+"""Button platform for Samsung Remote integration."""
+import logging
 from typing import Any
 
 from homeassistant.components.button import ButtonEntity
@@ -6,153 +7,113 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, LOGGER
+from .const import (
+    DOMAIN,
+    CONNECTION_METHOD_SMARTTHINGS,
+    CONF_DEVICE_ID,
+    CONF_DEVICE_NAME,
+    SMARTTHINGS_COMMANDS,
+    TIZEN_KEYS,
+)
+from .api.smartthings import SmartThingsAPI
 
+_LOGGER = logging.getLogger(__name__)
 
-BUTTON_COMMANDS = {
-    "mute": {
-        "command": "MUTE",
-        "icon": "mdi:volume-mute",
-        "translation_key": "mute",
-    },
-    "home": {
-        "command": "HOME",
-        "icon": "mdi:home",
-        "translation_key": "home",
-    },
-    "menu": {
-        "command": "MENU",
-        "icon": "mdi:menu",
-        "translation_key": "menu",
-    },
-    "back": {
-        "command": "BACK",
-        "icon": "mdi:arrow-left",
-        "translation_key": "back",
-    },
-    "exit": {
-        "command": "EXIT",
-        "icon": "mdi:exit-to-app",
-        "translation_key": "exit",
-    },
-    "up": {
-        "command": "UP",
-        "icon": "mdi:arrow-up-bold",
-        "translation_key": "up",
-    },
-    "down": {
-        "command": "DOWN",
-        "icon": "mdi:arrow-down-bold",
-        "translation_key": "down",
-    },
-    "left": {
-        "command": "LEFT",
-        "icon": "mdi:arrow-left-bold",
-        "translation_key": "left",
-    },
-    "right": {
-        "command": "RIGHT",
-        "icon": "mdi:arrow-right-bold",
-        "translation_key": "right",
-    },
-    "enter": {
-        "command": "OK",
-        "icon": "mdi:keyboard-return",
-        "translation_key": "enter",
-    },
-    "play": {
-        "command": "PLAY",
-        "icon": "mdi:play",
-        "translation_key": "play",
-    },
-    "pause": {
-        "command": "PAUSE",
-        "icon": "mdi:pause",
-        "translation_key": "pause",
-    },
-    "stop": {
-        "command": "STOP",
-        "icon": "mdi:stop",
-        "translation_key": "stop",
-    },
-    "rewind": {
-        "command": "REWIND",
-        "icon": "mdi:rewind",
-        "translation_key": "rewind",
-    },
-    "fast_forward": {
-        "command": "FF",
-        "icon": "mdi:fast-forward",
-        "translation_key": "fast_forward",
-    },
-    "play_back": {
-        "command": "PLAY_BACK",
-        "icon": "mdi:skip-backward",
-        "translation_key": "play_back",
-    },
-    "source": {
-        "command": "SOURCE",
-        "icon": "mdi:video-input-hdmi",
-        "translation_key": "source",
-    },
+# Button definitions
+BUTTONS = {
+    "power": {"name": "Power", "icon": "mdi:power", "key": "POWER"},
+    "home": {"name": "Home", "icon": "mdi:home", "key": "HOME"},
+    "menu": {"name": "Menu", "icon": "mdi:menu", "key": "MENU"},
+    "back": {"name": "Back", "icon": "mdi:arrow-left", "key": "BACK"},
+    "up": {"name": "Up", "icon": "mdi:arrow-up", "key": "UP"},
+    "down": {"name": "Down", "icon": "mdi:arrow-down", "key": "DOWN"},
+    "left": {"name": "Left", "icon": "mdi:arrow-left", "key": "LEFT"},
+    "right": {"name": "Right", "icon": "mdi:arrow-right", "key": "RIGHT"},
+    "enter": {"name": "Enter", "icon": "mdi:check", "key": "ENTER"},
+    "play": {"name": "Play", "icon": "mdi:play", "key": "PLAY"},
+    "pause": {"name": "Pause", "icon": "mdi:pause", "key": "PAUSE"},
+    "stop": {"name": "Stop", "icon": "mdi:stop", "key": "STOP"},
+    "volume_up": {"name": "Volume Up", "icon": "mdi:volume-plus", "key": "VOLUME_UP"},
+    "volume_down": {"name": "Volume Down", "icon": "mdi:volume-minus", "key": "VOLUME_DOWN"},
+    "mute": {"name": "Mute", "icon": "mdi:volume-mute", "key": "MUTE"},
+    "channel_up": {"name": "Channel Up", "icon": "mdi:arrow-up-bold", "key": "CHANNEL_UP"},
+    "channel_down": {"name": "Channel Down", "icon": "mdi:arrow-down-bold", "key": "CHANNEL_DOWN"},
+    "source": {"name": "Source", "icon": "mdi:hdmi-port", "key": "SOURCE"},
 }
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up button entities."""
-    data = hass.data[DOMAIN][config_entry.entry_id]
+    """Set up Samsung Remote buttons from a config entry."""
+    connection_method = entry.data.get("connection_method")
     
-    buttons = [
-        SamsungTVButton(
-            hass=hass,
-            config_entry=config_entry,
-            api=data["api"],
-            device_id=data["device_id"],
-            device_name=data["device_name"],
-            button_id=button_id,
-            button_config=button_config,
-        )
-        for button_id, button_config in BUTTON_COMMANDS.items()
-    ]
+    buttons = []
+    
+    if connection_method == CONNECTION_METHOD_SMARTTHINGS:
+        device_id = entry.data[CONF_DEVICE_ID]
+        device_name = entry.data.get(CONF_DEVICE_NAME, "Samsung TV")
+        access_token = entry.data.get("access_token")
+        
+        for button_id, button_config in BUTTONS.items():
+            buttons.append(
+                SamsungSmartThingsButton(
+                    hass,
+                    device_id,
+                    device_name,
+                    button_id,
+                    button_config,
+                    access_token,
+                )
+            )
+    else:
+        # Local Tizen buttons
+        host = entry.data["host"]
+        name = entry.data.get("name", "Samsung TV")
+        
+        for button_id, button_config in BUTTONS.items():
+            buttons.append(
+                SamsungTizenButton(
+                    hass,
+                    host,
+                    name,
+                    button_id,
+                    button_config,
+                )
+            )
     
     async_add_entities(buttons)
 
 
-class SamsungTVButton(ButtonEntity):
-    """Representation of a Samsung TV button."""
-
-    _attr_has_entity_name = True
-    _attr_should_poll = False
+class SamsungSmartThingsButton(ButtonEntity):
+    """Representation of a Samsung TV button using SmartThings API."""
 
     def __init__(
         self,
         hass: HomeAssistant,
-        config_entry: ConfigEntry,
-        api: Any,
         device_id: str,
         device_name: str,
         button_id: str,
-        button_config: dict[str, str],
+        button_config: dict,
+        access_token: str = None,
     ):
         """Initialize the button."""
-        self.hass = hass
-        self._config_entry = config_entry
-        self._api = api
+        self._hass = hass
         self._device_id = device_id
         self._device_name = device_name
         self._button_id = button_id
-        self._command = button_config["command"]
-        self._attr_unique_id = f"{device_id}_{button_id}"
-        self._attr_icon = button_config["icon"]
-        self._attr_translation_key = button_config["translation_key"]
+        self._button_config = button_config
+        self._api = SmartThingsAPI(hass, device_id, access_token)
+        
+        self._attr_name = f"{device_name} {button_config['name']}"
+        self._attr_unique_id = f"{DOMAIN}_{device_id}_{button_id}"
+        self._attr_icon = button_config.get("icon")
 
     @property
-    def device_info(self) -> dict[str, Any]:
-        """Return device info."""
+    def device_info(self):
+        """Return device information."""
         return {
             "identifiers": {(DOMAIN, self._device_id)},
             "name": self._device_name,
@@ -162,22 +123,82 @@ class SamsungTVButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        LOGGER.debug(
-            f"Button '{self._button_id}' pressed, sending command: {self._command}"
-        )
+        key = self._button_config["key"]
+        
+        _LOGGER.debug(f"Button '{self._button_id}' pressed, sending command '{key}'")
+        
         try:
-            success = await self._api.send_command(self._device_id, self._command)
-            if success:
-                LOGGER.debug(
-                    f"Successfully sent command {self._command} for button {self._button_id}"
-                )
+            # Prüfe ob der Befehl in SmartThings unterstützt wird
+            if key.upper() in SMARTTHINGS_COMMANDS:
+                result = await self._api.send_command(key)
+                
+                if not result:
+                    _LOGGER.warning(
+                        f"Command {key} may have failed for button {self._button_id}"
+                    )
             else:
-                LOGGER.warning(
-                    f"Command {self._command} may have failed for button {self._button_id}"
-                )
+                # Versuche als direkten Key zu senden
+                tizen_key = TIZEN_KEYS.get(key.upper())
+                if tizen_key:
+                    result = await self._api.send_key(tizen_key)
+                    
+                    if not result:
+                        _LOGGER.warning(
+                            f"Key {tizen_key} may have failed for button {self._button_id}"
+                        )
+                else:
+                    _LOGGER.error(
+                        f"Command '{key}' is not supported. "
+                        f"This command may only work with Tizen Local API."
+                    )
+                    
         except Exception as e:
-            LOGGER.error(
-                f"Failed to send command {self._command} for button {self._button_id}: {e}",
-                exc_info=True,
-            )
-            raise
+            _LOGGER.error(f"Error pressing button '{self._button_id}': {e}")
+
+
+class SamsungTizenButton(ButtonEntity):
+    """Representation of a Samsung TV button using local Tizen API."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        host: str,
+        name: str,
+        button_id: str,
+        button_config: dict,
+    ):
+        """Initialize the button."""
+        self._hass = hass
+        self._host = host
+        self._name = name
+        self._button_id = button_id
+        self._button_config = button_config
+        
+        self._attr_name = f"{name} {button_config['name']}"
+        self._attr_unique_id = f"{DOMAIN}_{host}_{button_id}"
+        self._attr_icon = button_config.get("icon")
+
+    @property
+    def device_info(self):
+        """Return device information."""
+        return {
+            "identifiers": {(DOMAIN, self._host)},
+            "name": self._name,
+            "manufacturer": "Samsung",
+            "model": "Smart TV (Local)",
+        }
+
+    async def async_press(self) -> None:
+        """Handle the button press."""
+        key = self._button_config["key"]
+        tizen_key = TIZEN_KEYS.get(key.upper(), key)
+        
+        _LOGGER.debug(
+            f"Button '{self._button_id}' pressed, would send local key '{tizen_key}'"
+        )
+        
+        # TODO: Implement local Tizen WebSocket connection
+        _LOGGER.warning(
+            "Local Tizen support is limited. "
+            "For full functionality, use SmartThings API."
+        )
